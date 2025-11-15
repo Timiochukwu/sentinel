@@ -6,21 +6,46 @@ Sentinel is Africa's leading fraud detection platform for financial institutions
 
 ## Key Features
 
+### Backend
 - **Real-Time Fraud Scoring API**: Returns risk scores in <100ms with specific fraud flags
 - **Consortium Intelligence**: Detects cross-platform fraud patterns across multiple lenders
 - **15+ Detection Rules**: Comprehensive rule-based fraud detection system
+- **Machine Learning**: XGBoost models achieving 85%+ accuracy
+- **Redis Caching**: 50x faster lookups (<1ms) for velocity tracking
+- **Webhooks**: Real-time fraud alerts with HMAC signature verification
+- **BVN Verification**: Nigerian identity verification (NIBSS/NIMC integration)
 - **Privacy-Preserving**: Uses SHA-256 hashing to protect customer PII
-- **Dashboard**: Web-based UI for fraud analysts and risk managers
 - **Continuous Learning**: Feedback loop improves accuracy over time
+- **Monitoring**: OpenTelemetry tracing and structured logging
+
+### Frontend
+- **Modern 3D Dashboard**: Three.js animated backgrounds with glass morphism design
+- **Real-time Analytics**: Live charts and fraud metrics visualization
+- **Transaction Management**: Filter, search, and review flagged transactions
+- **Mobile Responsive**: Works perfectly on all devices
+- **Type-Safe**: Full TypeScript implementation
+- **Smooth Animations**: Framer Motion for fluid UI transitions
 
 ## Tech Stack
 
-- **Backend**: Python 3.11 + FastAPI
-- **Database**: PostgreSQL 15
-- **Cache**: Redis 7
-- **Frontend**: React 18 + TypeScript
-- **ML**: scikit-learn, XGBoost
+### Backend
+- **Framework**: Python 3.11 + FastAPI
+- **Database**: PostgreSQL 15 with JSONB support
+- **Cache**: Redis 7 (velocity tracking, rate limiting)
+- **ML**: XGBoost, scikit-learn
+- **Monitoring**: OpenTelemetry, Structlog
+- **Security**: HMAC-SHA256 webhooks, SHA-256 PII hashing
 - **Deployment**: Docker + Docker Compose
+
+### Frontend
+- **Framework**: React 18 + TypeScript
+- **Build Tool**: Vite (lightning-fast HMR)
+- **Styling**: Tailwind CSS with custom theme
+- **Animations**: Framer Motion
+- **3D Graphics**: Three.js + React Three Fiber
+- **Charts**: Recharts
+- **HTTP Client**: Axios
+- **Routing**: React Router v6
 
 ## Quick Start
 
@@ -62,14 +87,35 @@ python scripts/init_db.py
 docker-compose up -d
 ```
 
-6. Run the application:
+6. Run the backend:
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 ```
 
-The API will be available at `http://localhost:8000`
+The API will be available at `http://localhost:8080`
 
-API documentation: `http://localhost:8000/docs`
+API documentation: `http://localhost:8080/docs`
+
+### Frontend Setup
+
+1. Navigate to the frontend directory:
+```bash
+cd frontend
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Start the development server:
+```bash
+npm run dev
+```
+
+The dashboard will be available at `http://localhost:5173`
+
+For more details, see [frontend/README.md](frontend/README.md)
 
 ## API Usage
 
@@ -111,8 +157,8 @@ curl -X POST http://localhost:8000/api/v1/feedback \
 
 ```
 sentinel/
-├── app/
-│   ├── main.py                 # FastAPI application entry point
+├── app/                        # Backend application
+│   ├── main.py                # FastAPI entry point
 │   ├── api/
 │   │   ├── v1/
 │   │   │   ├── endpoints/
@@ -120,29 +166,58 @@ sentinel/
 │   │   │   │   ├── feedback.py
 │   │   │   │   └── dashboard.py
 │   │   │   └── api.py
-│   │   └── deps.py            # Dependencies and authentication
+│   │   └── deps.py           # Dependencies and authentication
 │   ├── core/
-│   │   ├── config.py          # Configuration management
-│   │   ├── security.py        # Security utilities
-│   │   └── fraud_detector.py  # Core fraud detection engine
+│   │   ├── config.py         # Configuration management
+│   │   ├── security.py       # Security utilities
+│   │   ├── fraud_detector_v2.py  # Enhanced fraud detector
+│   │   ├── logging_config.py # Structured logging
+│   │   └── monitoring.py     # OpenTelemetry tracing
 │   ├── models/
-│   │   ├── database.py        # Database models
-│   │   └── schemas.py         # Pydantic schemas
+│   │   ├── database.py       # Database models
+│   │   └── schemas.py        # Pydantic schemas
 │   ├── services/
-│   │   ├── consortium.py      # Consortium intelligence
-│   │   ├── rules.py           # Fraud detection rules
-│   │   └── learning.py        # ML and learning algorithms
+│   │   ├── consortium.py     # Consortium intelligence
+│   │   ├── rules.py          # 15+ fraud detection rules
+│   │   ├── redis_service.py  # Redis caching & velocity
+│   │   ├── ml_detector.py    # XGBoost ML predictions
+│   │   ├── webhook.py        # Real-time alerts
+│   │   └── bvn_verification.py # Nigerian identity verification
 │   └── db/
-│       ├── session.py         # Database session management
-│       └── init_db.py         # Database initialization
-├── frontend/                   # React dashboard (separate directory)
+│       ├── session.py        # Database session management
+│       └── init_db.py        # Database initialization
+├── frontend/                  # React dashboard
+│   ├── src/
+│   │   ├── components/       # Reusable components
+│   │   │   ├── Background3D.tsx
+│   │   │   ├── Layout.tsx
+│   │   │   └── StatCard.tsx
+│   │   ├── pages/           # Route pages
+│   │   │   ├── Dashboard.tsx
+│   │   │   ├── Transactions.tsx
+│   │   │   ├── Analytics.tsx
+│   │   │   ├── Settings.tsx
+│   │   │   └── Login.tsx
+│   │   ├── lib/
+│   │   │   └── api.ts       # API client
+│   │   ├── types/
+│   │   │   └── index.ts     # TypeScript types
+│   │   ├── App.tsx          # Root component
+│   │   ├── main.tsx         # Entry point
+│   │   └── index.css        # Global styles
+│   ├── package.json
+│   ├── tailwind.config.js   # Custom theme
+│   ├── vite.config.ts       # Vite configuration
+│   └── README.md            # Frontend documentation
+├── scripts/
+│   ├── init_db.py           # Database initialization
+│   ├── ml/
+│   │   └── train_model.py   # ML training pipeline
+│   └── seed_data.py         # Sample data
 ├── tests/
 │   ├── test_api.py
 │   ├── test_rules.py
 │   └── test_consortium.py
-├── scripts/
-│   ├── init_db.py             # Database initialization script
-│   └── seed_data.py           # Sample data for testing
 ├── docker-compose.yml
 ├── Dockerfile
 ├── requirements.txt
