@@ -139,6 +139,15 @@ class Client(Base):
     contact_email = Column(String(255))
     contact_phone = Column(String(50))
 
+    # Webhook configuration
+    webhook_url = Column(String(500))  # URL to receive webhook notifications
+    webhook_secret = Column(String(255))  # Secret for HMAC signature verification
+    webhook_events = Column(JSONB)  # List of events to send: ["transaction.high_risk", "fraud.confirmed"]
+
+    # ML configuration
+    ml_enabled = Column(Boolean, default=True)  # Use ML predictions
+    ml_weight = Column(Numeric(3, 2), default=0.7)  # Weight for ML vs rules (0.0-1.0)
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
