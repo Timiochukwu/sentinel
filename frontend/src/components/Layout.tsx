@@ -13,6 +13,9 @@ import {
   User,
   Zap,
 } from 'lucide-react'
+import APIHealthIndicator from './APIHealthIndicator'
+import RateLimitBadge from './RateLimitBadge'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 
 interface LayoutProps {
   children: ReactNode
@@ -29,6 +32,7 @@ const navigation = [
 export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
+  const isOnline = useOnlineStatus() // Monitor online status
 
   return (
     <div className="min-h-screen">
@@ -139,6 +143,15 @@ export default function Layout({ children }: LayoutProps) {
             </div>
 
             <div className="flex items-center space-x-4">
+              {/* Rate Limit Badge */}
+              <div className="hidden lg:block">
+                <RateLimitBadge />
+              </div>
+
+              {/* API Health Indicator */}
+              <APIHealthIndicator />
+
+              {/* Notifications */}
               <button className="relative p-2 rounded-lg hover:bg-white/5">
                 <Bell className="w-5 h-5" />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />

@@ -7,12 +7,16 @@ import {
   DollarSign,
   Activity,
   CheckCircle2,
+  FileX,
 } from 'lucide-react'
 import Layout from '../components/Layout'
 import Background3D from '../components/Background3D'
 import StatCard from '../components/StatCard'
+import EmptyState from '../components/EmptyState'
+import { DashboardSkeleton } from '../components/LoadingSkeleton'
 import { fraudAPI } from '../lib/api'
 import { DashboardStats as StatsType } from '../types'
+import { useNavigate } from 'react-router-dom'
 import {
   LineChart,
   Line,
@@ -32,6 +36,8 @@ import {
 export default function Dashboard() {
   const [stats, setStats] = useState<StatsType | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     loadStats()
@@ -39,27 +45,41 @@ export default function Dashboard() {
 
   const loadStats = async () => {
     try {
+      setError(null)
       const data = await fraudAPI.getStats()
       setStats(data)
     } catch (error) {
       console.error('Failed to load stats:', error)
+      setError('Failed to load dashboard stats')
     } finally {
       setLoading(false)
     }
   }
 
+  // Show loading skeleton
   if (loading) {
     return (
       <Layout>
         <Background3D />
-        <div className="flex items-center justify-center h-96">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-          >
-            <Shield className="w-12 h-12 text-purple-400" />
-          </motion.div>
-        </div>
+        <DashboardSkeleton />
+      </Layout>
+    )
+  }
+
+  // Show empty state if no data
+  if (!stats || (stats.today_transactions === 0 && stats.month_transactions === 0)) {
+    return (
+      <Layout>
+        <Background3D />
+        <EmptyState
+          icon={FileX}
+          title="No transactions yet"
+          description="Start by testing fraud detection in the playground or integrate with your API to begin seeing analytics."
+          action={{
+            label: "Go to Test Playground",
+            onClick: () => navigate('/test')
+          }}
+        />
       </Layout>
     )
   }
