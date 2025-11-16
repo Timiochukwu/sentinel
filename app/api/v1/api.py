@@ -1,7 +1,7 @@
 """API v1 router - combines all endpoint routers"""
 
 from fastapi import APIRouter
-from app.api.v1.endpoints import fraud_detection, feedback, dashboard
+from app.api.v1.endpoints import fraud_detection, feedback, dashboard, consortium
 
 api_router = APIRouter()
 
@@ -19,4 +19,9 @@ api_router.include_router(
 api_router.include_router(
     dashboard.router,
     tags=["dashboard"]
+)
+
+api_router.include_router(
+    consortium.router,
+    tags=["consortium"]
 )

@@ -102,28 +102,71 @@ async def get_dashboard_stats(
     )
 
 
-@router.get("/dashboard/transactions", response_model=List[TransactionHistory])
+@router.get("/dashboard/transactions")
 async def get_transaction_history(
     client: Client = Depends(get_current_client),
     db: Session = Depends(get_db),
-    risk_level: Optional[str] = Query(None, description="Filter by risk level"),
-    outcome: Optional[str] = Query(None, description="Filter by outcome"),
+    # Basic filters
+    risk_level: Optional[str] = Query(None, description="Filter by single risk level (use risk_levels for multiple)"),
+    risk_levels: Optional[str] = Query(None, description="Filter by multiple risk levels (comma-separated: low,medium,high)"),
+    decision: Optional[str] = Query(None, description="Filter by decision (approve, review, decline)"),
+    decisions: Optional[str] = Query(None, description="Filter by multiple decisions (comma-separated)"),
+    outcome: Optional[str] = Query(None, description="Filter by outcome (fraud, legitimate, pending)"),
+    # Date range filters
+    start_date: Optional[str] = Query(None, description="Start date (ISO format: 2024-01-01)"),
+    end_date: Optional[str] = Query(None, description="End date (ISO format: 2024-12-31)"),
+    # Amount range filters
+    min_amount: Optional[float] = Query(None, ge=0, description="Minimum transaction amount"),
+    max_amount: Optional[float] = Query(None, ge=0, description="Maximum transaction amount"),
+    # Search query
+    search: Optional[str] = Query(None, description="Search by transaction_id or user_id"),
+    # Pagination
     limit: int = Query(50, ge=1, le=100, description="Number of transactions to return"),
     offset: int = Query(0, ge=0, description="Offset for pagination")
 ):
     """
-    Get transaction history
+    Get transaction history with advanced filtering
 
-    Returns a list of recent transactions with filters for risk level and outcome.
+    Returns a list of recent transactions with comprehensive filtering options:
+    - Risk levels (single or multiple)
+    - Decisions (approve, review, decline)
+    - Outcomes (fraud, legitimate, pending)
+    - Date range (start_date to end_date)
+    - Amount range (min_amount to max_amount)
+    - Search (transaction_id or user_id)
+    - Pagination (limit, offset)
+
+    Returns:
+        {
+            "transactions": [...],
+            "total": 1234,
+            "offset": 0,
+            "limit": 50
+        }
     """
     query = db.query(Transaction).filter(
         Transaction.client_id == client.client_id
     )
 
-    # Apply filters
-    if risk_level:
+    # Risk level filters
+    if risk_levels:
+        # Multiple risk levels (comma-separated: "low,medium,high")
+        levels = [level.strip() for level in risk_levels.split(",")]
+        query = query.filter(Transaction.risk_level.in_(levels))
+    elif risk_level:
+        # Single risk level (backwards compatibility)
         query = query.filter(Transaction.risk_level == risk_level)
 
+    # Decision filters
+    if decisions:
+        # Multiple decisions (comma-separated: "approve,review,decline")
+        decision_list = [d.strip() for d in decisions.split(",")]
+        query = query.filter(Transaction.decision.in_(decision_list))
+    elif decision:
+        # Single decision (backwards compatibility)
+        query = query.filter(Transaction.decision == decision)
+
+    # Outcome filter
     if outcome:
         if outcome == "fraud":
             query = query.filter(Transaction.is_fraud == True)
@@ -131,6 +174,41 @@ async def get_transaction_history(
             query = query.filter(Transaction.is_fraud == False)
         elif outcome == "pending":
             query = query.filter(Transaction.is_fraud == None)
+
+    # Date range filters
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date)
+            query = query.filter(Transaction.created_at >= start_dt)
+        except ValueError:
+            pass  # Invalid date format, skip filter
+
+    if end_date:
+        try:
+            # Add 23:59:59 to include entire end day
+            end_dt = datetime.fromisoformat(end_date)
+            end_dt = end_dt.replace(hour=23, minute=59, second=59)
+            query = query.filter(Transaction.created_at <= end_dt)
+        except ValueError:
+            pass  # Invalid date format, skip filter
+
+    # Amount range filters
+    if min_amount is not None:
+        query = query.filter(Transaction.amount >= min_amount)
+
+    if max_amount is not None:
+        query = query.filter(Transaction.amount <= max_amount)
+
+    # Search filter (transaction_id or user_id)
+    if search:
+        search_pattern = f"%{search}%"
+        query = query.filter(
+            (Transaction.transaction_id.ilike(search_pattern)) |
+            (Transaction.user_id.ilike(search_pattern))
+        )
+
+    # Get total count before pagination (for frontend pagination UI)
+    total_count = query.count()
 
     # Order by newest first
     query = query.order_by(Transaction.created_at.desc())
@@ -147,17 +225,24 @@ async def get_transaction_history(
         else:
             outcome_str = "pending"
 
-        result.append(TransactionHistory(
-            transaction_id=txn.transaction_id,
-            amount=float(txn.amount),
-            risk_score=txn.risk_score,
-            risk_level=txn.risk_level,
-            decision=txn.decision,
-            outcome=outcome_str,
-            created_at=txn.created_at
-        ))
+        result.append({
+            "transaction_id": txn.transaction_id,
+            "user_id": txn.user_id,
+            "amount": float(txn.amount),
+            "risk_score": txn.risk_score,
+            "risk_level": txn.risk_level,
+            "decision": txn.decision,
+            "outcome": outcome_str,
+            "created_at": txn.created_at.isoformat() if txn.created_at else None
+        })
 
-    return result
+    # Return transactions with pagination metadata
+    return {
+        "transactions": result,
+        "total": total_count,
+        "offset": offset,
+        "limit": limit
+    }
 
 
 @router.get("/dashboard/client-info", response_model=ClientInfo)
