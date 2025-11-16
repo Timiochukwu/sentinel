@@ -6,7 +6,109 @@ Complete guide for setting up and running Sentinel on macOS.
 
 ## ✅ Prerequisites
 
-You mentioned you already have Python installed via Homebrew - perfect! Let's verify and set up the rest.
+Before starting, make sure you have:
+- **Git** installed (comes with macOS developer tools)
+- **Homebrew** installed (https://brew.sh)
+- **Python 3.11+** (we'll verify this below)
+
+### Install Git (if needed)
+
+```bash
+# Check if Git is installed
+git --version
+
+# If not installed, install Xcode Command Line Tools (includes Git)
+xcode-select --install
+
+# Or install via Homebrew
+brew install git
+```
+
+### Install Homebrew (if needed)
+
+```bash
+# Check if Homebrew is installed
+brew --version
+
+# If not installed, install Homebrew
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+---
+
+## 📥 Step 0: Clone the Repository
+
+First, let's get the Sentinel code on your Mac.
+
+```bash
+# Navigate to where you want to store the project
+cd ~  # Or any directory you prefer
+
+# Clone the Sentinel repository from GitHub
+git clone https://github.com/Timiochukwu/sentinel.git
+
+# Navigate into the project directory
+cd sentinel
+
+# Verify you're in the right place
+ls -la
+# You should see: app/, frontend/, scripts/, README.md, etc.
+```
+
+### Check which branch you're on
+
+```bash
+# See current branch
+git branch
+
+# If you need to switch to a specific branch (replace with your branch name)
+# git checkout claude/nigerian-fraud-detection-prd-01K7NkayvtnzGiWoh3JrBFoK
+```
+
+**Important**: All the commands below assume you're in the `sentinel` directory. If you close your terminal and come back later, make sure to:
+
+```bash
+cd ~/sentinel  # Or wherever you cloned it
+```
+
+---
+
+## 🚀 Quick Start (TL;DR)
+
+If you just want to get up and running quickly after cloning:
+
+```bash
+# 1. Clone and navigate
+git clone https://github.com/Timiochukwu/sentinel.git
+cd sentinel
+
+# 2. Install dependencies
+brew install postgresql@15 redis
+pip3 install -r requirements.txt
+
+# 3. Start services
+brew services start postgresql@15
+brew services start redis
+
+# 4. Set up database
+createdb sentinel
+cp .env.example .env  # Then edit .env with your settings
+python3 scripts/init_db.py
+
+# 5. Start API server
+python3 -m uvicorn app.main:app --reload --port 8080
+
+# 6. In another terminal, generate test data
+cd ~/sentinel
+python3 scripts/generate_synthetic_data.py --count 10000
+
+# 7. Test the API
+curl http://localhost:8080/health
+```
+
+**That's it!** Your Sentinel API is now running at http://localhost:8080
+
+For detailed explanations of each step, continue reading below.
 
 ---
 
@@ -511,6 +613,56 @@ SELECT * FROM transactions ORDER BY created_at DESC LIMIT 10;
 
 # Count fraud vs legitimate
 SELECT is_fraud, COUNT(*) FROM transactions GROUP BY is_fraud;
+```
+
+---
+
+## ✅ First Time Setup Checklist
+
+Here's everything you need to do **once** when setting up Sentinel for the first time:
+
+### Initial Setup (Do Once)
+
+- [ ] **Clone repository**: `git clone https://github.com/Timiochukwu/sentinel.git`
+- [ ] **Install Homebrew** (if not installed): `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`
+- [ ] **Install Python 3.11+**: `brew install python@3.11`
+- [ ] **Install PostgreSQL**: `brew install postgresql@15`
+- [ ] **Install Redis**: `brew install redis`
+- [ ] **Install Python packages**: `pip3 install -r requirements.txt`
+- [ ] **Create database**: `createdb sentinel`
+- [ ] **Configure environment**: `cp .env.example .env` and edit values
+- [ ] **Initialize database**: `python3 scripts/init_db.py`
+- [ ] **Generate test data**: `python3 scripts/generate_synthetic_data.py --count 10000`
+
+### Every Time You Start Working (Daily)
+
+```bash
+# 1. Navigate to project
+cd ~/sentinel
+
+# 2. Make sure PostgreSQL is running
+brew services start postgresql@15
+
+# 3. Make sure Redis is running
+brew services start redis
+
+# 4. Start the API server
+python3 -m uvicorn app.main:app --reload --port 8080
+
+# 5. (Optional) Start frontend in another terminal
+cd ~/sentinel/frontend
+npm run dev
+```
+
+### To Stop Everything
+
+```bash
+# Stop API: Press Ctrl+C in the terminal running uvicorn
+# Stop frontend: Press Ctrl+C in the terminal running npm
+
+# Stop background services (optional, they can keep running)
+brew services stop postgresql@15
+brew services stop redis
 ```
 
 ---
