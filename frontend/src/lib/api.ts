@@ -15,7 +15,7 @@
  *   const stats = await fraudAPI.getStats()  // Automatically retries on failure
  */
 
-import axios, { AxiosError, AxiosRequestConfig } from 'axios'
+import axios, { AxiosError } from 'axios'
 import { toast } from '../components/Toast'
 
 // API Configuration
@@ -173,7 +173,7 @@ export const checkAPIHealth = async (): Promise<{
 }> => {
   try {
     const startTime = Date.now()
-    const { data } = await api.get('/health')
+    await api.get('/health')
     const latency = Date.now() - startTime
 
     return {

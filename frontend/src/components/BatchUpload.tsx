@@ -19,8 +19,8 @@
  */
 
 import { useState, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Upload, FileText, AlertCircle, CheckCircle2, Download, X } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Upload, FileText, Download, X } from 'lucide-react'
 import { fraudAPI } from '../lib/api'
 import { toast } from './Toast'
 import { exportToCSV } from '../utils/export'

@@ -13,7 +13,7 @@
  */
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, AlertTriangle, Shield, MapPin, Smartphone, Clock, Users, TrendingUp } from 'lucide-react'
+import { X, AlertTriangle, Shield, Clock, Users, TrendingUp } from 'lucide-react'
 import { TransactionDetail } from '../types'
 
 interface TransactionDetailsModalProps {

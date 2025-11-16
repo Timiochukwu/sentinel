@@ -34,7 +34,7 @@ const navigation = [
 export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
-  const isOnline = useOnlineStatus() // Monitor online status
+  useOnlineStatus() // Monitor online status (hook manages toast notifications)
 
   return (
     <div className="min-h-screen">

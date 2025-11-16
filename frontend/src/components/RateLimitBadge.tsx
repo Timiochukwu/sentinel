@@ -35,9 +35,6 @@ export default function RateLimitBadge() {
     return null
   }
 
-  // Calculate percentage for color coding
-  const percentage = (remaining / 100) * 100 // Assuming 100 req/min for starter plan
-
   // Color based on remaining requests
   const getColor = () => {
     if (remaining < 10) return 'text-red-400 bg-red-500/20'

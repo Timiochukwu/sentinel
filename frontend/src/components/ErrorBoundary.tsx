@@ -100,7 +100,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </p>
 
             {/* Error Details (only in development) */}
-            {process.env.NODE_ENV === 'development' && this.state.error && (
+            {import.meta.env.DEV && this.state.error && (
               <div className="bg-black/50 rounded-lg p-4 mb-6 overflow-auto max-h-64">
                 <p className="text-red-400 font-mono text-sm mb-2">
                   {this.state.error.toString()}

@@ -18,25 +18,16 @@ import { fraudAPI } from '../lib/api'
 import { DashboardStats as StatsType } from '../types'
 import { useNavigate } from 'react-router-dom'
 import {
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
   PieChart,
   Pie,
   Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from 'recharts'
 
 export default function Dashboard() {
   const [stats, setStats] = useState<StatsType | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -45,12 +36,10 @@ export default function Dashboard() {
 
   const loadStats = async () => {
     try {
-      setError(null)
       const data = await fraudAPI.getStats()
       setStats(data)
     } catch (error) {
       console.error('Failed to load stats:', error)
-      setError('Failed to load dashboard stats')
     } finally {
       setLoading(false)
     }

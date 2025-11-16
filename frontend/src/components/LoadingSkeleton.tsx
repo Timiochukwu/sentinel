@@ -9,12 +9,10 @@
  *   {loading ? <ChartSkeleton /> : <Chart {...props} />}
  */
 
-import { motion } from 'framer-motion'
-
 // Base skeleton element with shimmer effect
-function SkeletonElement({ className = '' }: { className?: string }) {
+function SkeletonElement({ className = '', style }: { className?: string; style?: React.CSSProperties }) {
   return (
-    <div className={`bg-white/5 rounded animate-pulse ${className}`}>
+    <div className={`bg-white/5 rounded animate-pulse ${className}`} style={style}>
       <div className="shimmer" />
     </div>
   )
