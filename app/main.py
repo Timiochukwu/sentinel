@@ -1,4 +1,16 @@
-"""Main FastAPI application"""
+"""
+Main FastAPI Application
+
+This is the entry point for the Sentinel API. It sets up:
+- FastAPI application with automatic documentation
+- CORS middleware (allows frontend to connect)
+- Rate limiting middleware (prevents API abuse)
+- Request timing (tracks how long each request takes)
+- Health check endpoint (monitoring)
+- API routes (fraud detection endpoints)
+
+Think of this file as the "switchboard" that connects everything together.
+"""
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +21,8 @@ import time
 from app.core.config import settings
 from app.api.v1.api import api_router
 from app.models.schemas import HealthCheck
+from app.middleware.rate_limit import RateLimitMiddleware
+from app.services.redis_service import RedisService
 
 # Create FastAPI application
 app = FastAPI(
@@ -55,17 +69,32 @@ For support, contact: support@sentinel-fraud.com
     openapi_url="/openapi.json"
 )
 
-# CORS middleware
+# CORS middleware (Cross-Origin Resource Sharing)
+# This allows your frontend (running on localhost:5173) to call the API (localhost:8080)
+# Without this, browsers would block requests due to "same-origin policy"
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.CORS_ORIGINS,  # Which domains can call this API
+    allow_credentials=True,                # Allow cookies/authentication
+    allow_methods=["*"],                   # Allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],                   # Allow all headers
 )
 
 
+# Rate limiting middleware
+# This prevents API abuse by limiting requests per minute
+# Example: Starter plan gets 100 req/min, Pro gets 1,000 req/min
+try:
+    redis_service = RedisService()
+    app.add_middleware(RateLimitMiddleware, redis_service=redis_service)
+    print("✅ Rate limiting enabled (Redis connected)")
+except Exception as e:
+    print(f"⚠️  Rate limiting disabled (Redis not available): {e}")
+    # API still works without rate limiting, just no protection against abuse
+
+
 # Request timing middleware
+# This tracks how long each request takes and adds it to response headers
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     """Add processing time to response headers"""
