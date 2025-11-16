@@ -1,19 +1,38 @@
-# Sentinel - Nigerian Fraud Detection Platform
+# Sentinel - Multi-Vertical Fraud Detection Platform
 
 ## Overview
 
-Sentinel is Africa's leading fraud detection platform for financial institutions, starting with Nigerian lenders. The platform prevents ₦50B+ in annual fraud losses through real-time risk intelligence and consortium-based fraud pattern sharing.
+Sentinel is Africa's leading fraud detection platform for digital businesses. Starting with Nigerian lenders and expanding across fintech, e-commerce, betting, crypto, and marketplace verticals, the platform prevents ₦50B+ in annual fraud losses through real-time risk intelligence and consortium-based fraud pattern sharing.
+
+## Supported Industries
+
+### 💰 Fintech & Lending
+Loan stacking, SIM swap attacks, account takeover, new account fraud
+
+### 🛒 E-commerce
+Card testing, BIN fraud, shipping/billing mismatches, chargeback abuse, fake transfer screenshots
+
+### 🎲 Betting & Gaming
+Bonus abuse, multi-accounting, arbitrage betting, withdrawal without wagering, gnoming
+
+### ₿ Crypto Platforms
+New wallet fraud, P2P scams, suspicious wallet addresses, wash trading, money laundering
+
+### 🏪 Online Marketplaces
+Seller fraud, fake listings, new seller scams, low-rated seller warnings, high-risk categories
 
 ## Key Features
 
 ### Backend
 - **Real-Time Fraud Scoring API**: Returns risk scores in <100ms with specific fraud flags
-- **Consortium Intelligence**: Detects cross-platform fraud patterns across multiple lenders
-- **15+ Detection Rules**: Comprehensive rule-based fraud detection system
-- **Machine Learning**: XGBoost models achieving 85%+ accuracy
+- **Multi-Vertical Support**: 5 industries with 29+ specialized fraud detection rules
+- **Consortium Intelligence**: Detects cross-platform fraud patterns across multiple businesses
+- **Advanced Machine Learning**: XGBoost models with 60+ engineered features achieving 85%+ accuracy
 - **Redis Caching**: 50x faster lookups (<1ms) for velocity tracking
 - **Webhooks**: Real-time fraud alerts with HMAC signature verification
 - **BVN Verification**: Nigerian identity verification (NIBSS/NIMC integration)
+- **Card BIN Intelligence**: High-risk card detection for e-commerce
+- **Wallet Blacklisting**: Crypto wallet fraud database
 - **Privacy-Preserving**: Uses SHA-256 hashing to protect customer PII
 - **Continuous Learning**: Feedback loop improves accuracy over time
 - **Monitoring**: OpenTelemetry tracing and structured logging
@@ -227,11 +246,12 @@ sentinel/
 
 ## Fraud Detection Rules
 
-Sentinel implements 15+ fraud detection rules:
+Sentinel implements **29 specialized fraud detection rules** across all verticals:
 
+### Core/Fintech Rules (1-15)
 1. **New Account Large Amount**: New accounts (<7 days) with large transactions
-2. **Loan Stacking**: Multiple lender applications within 7 days
-3. **SIM Swap Pattern**: Phone change + new device + withdrawal
+2. **Loan Stacking**: Multiple lender applications within 7 days (critical)
+3. **SIM Swap Pattern**: Phone change + new device + withdrawal (critical)
 4. **Suspicious Hours**: Transactions during 2am-5am
 5. **Velocity Check**: Multiple transactions in short time
 6. **Contact Change + Withdrawal**: Recent contact changes with withdrawals
@@ -244,6 +264,28 @@ Sentinel implements 15+ fraud detection rules:
 13. **Device Sharing**: Single device for multiple accounts
 14. **Dormant Account Activation**: Long-dormant accounts suddenly active
 15. **Sequential Applications**: Patterns indicating coordinated fraud
+
+### E-commerce Rules (16-19)
+16. **Card BIN Fraud**: High-risk card BINs
+17. **Multiple Failed Payments**: Card testing attacks (critical)
+18. **Shipping Mismatch**: Different shipping/billing addresses
+19. **Digital Goods High Value**: High-value digital purchases by new accounts
+
+### Betting/Gaming Rules (20-23)
+20. **Bonus Abuse**: Multi-accounting for bonus claims
+21. **Withdrawal Without Wagering**: Money laundering risk (critical)
+22. **Arbitrage Betting**: Betting on all outcomes
+23. **Excessive Withdrawals**: Multiple withdrawals indicating structuring
+
+### Crypto Rules (24-26)
+24. **New Wallet High Value**: New wallet with large transaction
+25. **Suspicious Wallet**: Blacklisted wallet addresses (critical)
+26. **P2P Velocity**: Excessive P2P trading activity
+
+### Marketplace Rules (27-29)
+27. **New Seller High Value**: New sellers with expensive items
+28. **Low Rated Seller**: Poor seller ratings on high-value sales
+29. **High Risk Category**: Electronics, phones, gift cards fraud
 
 ## Performance
 

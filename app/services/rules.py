@@ -428,11 +428,370 @@ class SequentialApplicationsRule(FraudRule):
         return None
 
 
+### E-COMMERCE FRAUD RULES ###
+
+class CardBINFraudRule(FraudRule):
+    """Rule 16: Card BIN Fraud - High-risk card BINs"""
+
+    def __init__(self):
+        super().__init__(
+            name="card_bin_fraud",
+            description="Card from high-risk BIN",
+            base_score=35,
+            severity="high"
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.card_bin:
+            # Check against known high-risk BINs (would be loaded from database in production)
+            high_risk_bins = context.get("high_risk_bins", [])
+            if transaction.card_bin in high_risk_bins:
+                return FraudFlag(
+                    type=self.name,
+                    severity=self.severity,
+                    message=f"Card BIN {transaction.card_bin} flagged as high-risk",
+                    score=self.base_score,
+                    confidence=0.85
+                )
+        return None
+
+
+class MultipleFailedPaymentsRule(FraudRule):
+    """Rule 17: Multiple Failed Payments - Card testing fraud"""
+
+    def __init__(self):
+        super().__init__(
+            name="multiple_failed_payments",
+            description="Multiple failed payment attempts",
+            base_score=40,
+            severity="critical"
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        velocity_data = context.get("velocity", {})
+        failed_count_1hour = velocity_data.get("failed_payment_count_1hour", 0)
+
+        if failed_count_1hour >= 3:
+            return FraudFlag(
+                type=self.name,
+                severity=self.severity,
+                message=f"{failed_count_1hour} failed payment attempts in last hour - possible card testing",
+                score=self.base_score,
+                confidence=0.89
+            )
+        return None
+
+
+class ShippingMismatchRule(FraudRule):
+    """Rule 18: Shipping/Billing Mismatch - Different addresses"""
+
+    def __init__(self):
+        super().__init__(
+            name="shipping_mismatch",
+            description="Shipping and billing addresses don't match",
+            base_score=25,
+            severity="medium"
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.shipping_address_matches_billing is False:
+            if transaction.amount > 50000:  # High-value purchase
+                return FraudFlag(
+                    type=self.name,
+                    severity=self.severity,
+                    message=f"₦{transaction.amount:,.0f} purchase with mismatched shipping/billing",
+                    score=self.base_score,
+                    confidence=0.72
+                )
+        return None
+
+
+class DigitalGoodsHighValueRule(FraudRule):
+    """Rule 19: Digital Goods High Value - High-risk for chargebacks"""
+
+    def __init__(self):
+        super().__init__(
+            name="digital_goods_high_value",
+            description="High-value digital goods purchase",
+            base_score=20,
+            severity="medium"
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.is_digital_goods and transaction.amount > 100000:
+            if transaction.account_age_days and transaction.account_age_days < 30:
+                return FraudFlag(
+                    type=self.name,
+                    severity=self.severity,
+                    message=f"New account purchasing ₦{transaction.amount:,.0f} in digital goods",
+                    score=self.base_score,
+                    confidence=0.68
+                )
+        return None
+
+
+### BETTING/GAMING FRAUD RULES ###
+
+class BonusAbuseRule(FraudRule):
+    """Rule 20: Bonus Abuse - Suspicious bonus claiming patterns"""
+
+    def __init__(self):
+        super().__init__(
+            name="bonus_abuse",
+            description="Potential bonus abuse pattern",
+            base_score=35,
+            severity="high"
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.transaction_type == "bonus_claim":
+            # Check if multiple accounts from same device claiming bonuses
+            device_usage = context.get("device_usage", {})
+            account_count = device_usage.get("account_count", 0)
+
+            if account_count >= 3:
+                return FraudFlag(
+                    type=self.name,
+                    severity=self.severity,
+                    message=f"Bonus claim from device with {account_count} accounts - multi-accounting suspected",
+                    score=self.base_score,
+                    confidence=0.87
+                )
+        return None
+
+
+class WithdrawalWithoutWageringRule(FraudRule):
+    """Rule 21: Withdrawal Without Wagering - Money laundering risk"""
+
+    def __init__(self):
+        super().__init__(
+            name="withdrawal_without_wagering",
+            description="Withdrawal without sufficient wagering",
+            base_score=45,
+            severity="critical"
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.transaction_type in ["bet_withdrawal", "withdrawal"]:
+            wagering_ratio = context.get("wagering_ratio", 0)  # Ratio of bets to deposits
+
+            if wagering_ratio < 0.5 and transaction.amount > 100000:
+                return FraudFlag(
+                    type=self.name,
+                    severity=self.severity,
+                    message=f"₦{transaction.amount:,.0f} withdrawal with minimal wagering - possible money laundering",
+                    score=self.base_score,
+                    confidence=0.82
+                )
+        return None
+
+
+class ArbitrageBettingRule(FraudRule):
+    """Rule 22: Arbitrage Betting - Betting on all outcomes"""
+
+    def __init__(self):
+        super().__init__(
+            name="arbitrage_betting",
+            description="Arbitrage betting pattern detected",
+            base_score=30,
+            severity="medium"
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.bet_pattern_unusual:
+            return FraudFlag(
+                type=self.name,
+                severity=self.severity,
+                message="Unusual betting pattern suggests arbitrage betting",
+                score=self.base_score,
+                confidence=0.75
+            )
+        return None
+
+
+class ExcessiveWithdrawalsRule(FraudRule):
+    """Rule 23: Excessive Withdrawals - Multiple withdrawals in short time"""
+
+    def __init__(self):
+        super().__init__(
+            name="excessive_withdrawals",
+            description="Too many withdrawal attempts",
+            base_score=25,
+            severity="medium"
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.withdrawal_count_today and transaction.withdrawal_count_today >= 5:
+            return FraudFlag(
+                type=self.name,
+                severity=self.severity,
+                message=f"{transaction.withdrawal_count_today} withdrawals today - possible structuring",
+                score=self.base_score,
+                confidence=0.71
+            )
+        return None
+
+
+### CRYPTO FRAUD RULES ###
+
+class NewWalletHighValueRule(FraudRule):
+    """Rule 24: New Wallet High Value - New wallet with large transaction"""
+
+    def __init__(self):
+        super().__init__(
+            name="new_wallet_high_value",
+            description="New crypto wallet with high-value transaction",
+            base_score=35,
+            severity="high"
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.is_new_wallet and transaction.amount > 500000:
+            return FraudFlag(
+                type=self.name,
+                severity=self.severity,
+                message=f"First-time wallet attempting ₦{transaction.amount:,.0f} transaction",
+                score=self.base_score,
+                confidence=0.79
+            )
+        return None
+
+
+class SuspiciousWalletRule(FraudRule):
+    """Rule 25: Suspicious Wallet - Wallet linked to fraud/scams"""
+
+    def __init__(self):
+        super().__init__(
+            name="suspicious_wallet",
+            description="Wallet address flagged as suspicious",
+            base_score=50,
+            severity="critical"
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.wallet_address:
+            # Check against blacklisted wallets
+            blacklisted_wallets = context.get("blacklisted_wallets", [])
+            if transaction.wallet_address in blacklisted_wallets:
+                return FraudFlag(
+                    type=self.name,
+                    severity=self.severity,
+                    message=f"Wallet {transaction.wallet_address[:10]}... flagged for fraud/scam activity",
+                    score=self.base_score,
+                    confidence=0.95
+                )
+        return None
+
+
+class P2PVelocityRule(FraudRule):
+    """Rule 26: P2P High Velocity - Too many P2P trades"""
+
+    def __init__(self):
+        super().__init__(
+            name="p2p_velocity",
+            description="Excessive P2P trading activity",
+            base_score=30,
+            severity="high"
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.transaction_type == "p2p_trade":
+            velocity_data = context.get("velocity", {})
+            p2p_count_24h = velocity_data.get("p2p_count_24hour", 0)
+
+            if p2p_count_24h > 10:
+                return FraudFlag(
+                    type=self.name,
+                    severity=self.severity,
+                    message=f"{p2p_count_24h} P2P trades in 24 hours - possible money laundering",
+                    score=self.base_score,
+                    confidence=0.76
+                )
+        return None
+
+
+### MARKETPLACE FRAUD RULES ###
+
+class NewSellerHighValueRule(FraudRule):
+    """Rule 27: New Seller High Value - New seller with expensive items"""
+
+    def __init__(self):
+        super().__init__(
+            name="new_seller_high_value",
+            description="New seller listing high-value items",
+            base_score=35,
+            severity="high"
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.seller_account_age_days and transaction.seller_account_age_days < 7:
+            if transaction.is_high_value_item:
+                return FraudFlag(
+                    type=self.name,
+                    severity=self.severity,
+                    message=f"Seller account only {transaction.seller_account_age_days} days old selling high-value items",
+                    score=self.base_score,
+                    confidence=0.83
+                )
+        return None
+
+
+class LowRatedSellerRule(FraudRule):
+    """Rule 28: Low Rated Seller - Poor seller rating"""
+
+    def __init__(self):
+        super().__init__(
+            name="low_rated_seller",
+            description="Seller has poor rating",
+            base_score=25,
+            severity="medium"
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.seller_rating and transaction.seller_rating < 2.5:
+            if transaction.amount > 50000:
+                return FraudFlag(
+                    type=self.name,
+                    severity=self.severity,
+                    message=f"Seller rating {transaction.seller_rating}/5.0 for ₦{transaction.amount:,.0f} transaction",
+                    score=self.base_score,
+                    confidence=0.69
+                )
+        return None
+
+
+class HighRiskCategoryRule(FraudRule):
+    """Rule 29: High Risk Category - Electronics, phones, gift cards"""
+
+    def __init__(self):
+        super().__init__(
+            name="high_risk_category",
+            description="High-risk product category",
+            base_score=15,
+            severity="low"
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.product_category:
+            high_risk_categories = ["electronics", "phones", "gift_cards", "luxury_goods", "gadgets"]
+            if transaction.product_category.lower() in high_risk_categories:
+                if transaction.account_age_days and transaction.account_age_days < 14:
+                    return FraudFlag(
+                        type=self.name,
+                        severity=self.severity,
+                        message=f"New account purchasing {transaction.product_category} - high fraud category",
+                        score=self.base_score,
+                        confidence=0.64
+                    )
+        return None
+
+
 class FraudRulesEngine:
     """Main fraud detection rules engine"""
 
     def __init__(self):
         """Initialize all fraud detection rules"""
+        # Core/Lending rules (Rules 1-15)
         self.rules: List[FraudRule] = [
             NewAccountLargeAmountRule(),
             LoanStackingRule(),
@@ -449,6 +808,28 @@ class FraudRulesEngine:
             DeviceSharingRule(),
             DormantAccountActivationRule(),
             SequentialApplicationsRule(),
+
+            # E-commerce rules (Rules 16-19)
+            CardBINFraudRule(),
+            MultipleFailedPaymentsRule(),
+            ShippingMismatchRule(),
+            DigitalGoodsHighValueRule(),
+
+            # Betting/Gaming rules (Rules 20-23)
+            BonusAbuseRule(),
+            WithdrawalWithoutWageringRule(),
+            ArbitrageBettingRule(),
+            ExcessiveWithdrawalsRule(),
+
+            # Crypto rules (Rules 24-26)
+            NewWalletHighValueRule(),
+            SuspiciousWalletRule(),
+            P2PVelocityRule(),
+
+            # Marketplace rules (Rules 27-29)
+            NewSellerHighValueRule(),
+            LowRatedSellerRule(),
+            HighRiskCategoryRule(),
         ]
 
     def evaluate(

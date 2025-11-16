@@ -233,6 +233,41 @@ class MLFraudDetector:
             transaction.transaction_type in ["withdrawal", "loan_disbursement"]
         )
 
+        # E-commerce features
+        features["has_card_bin"] = float(bool(transaction.card_bin))
+        features["is_card_payment"] = float(transaction.payment_method == "card" if transaction.payment_method else False)
+        features["shipping_billing_mismatch"] = float(transaction.shipping_address_matches_billing is False)
+        features["is_digital_goods"] = float(transaction.is_digital_goods or False)
+        features["failed_payment_count"] = float(velocity.get("failed_payment_count_1hour", 0))
+
+        # Betting/Gaming features
+        features["bet_count_today"] = float(transaction.bet_count_today or 0)
+        features["bonus_balance"] = float(transaction.bonus_balance or 0)
+        features["withdrawal_count_today"] = float(transaction.withdrawal_count_today or 0)
+        features["bet_pattern_unusual"] = float(transaction.bet_pattern_unusual or False)
+        features["wagering_ratio"] = float(context.get("wagering_ratio", 0))
+        features["is_bonus_claim"] = float(transaction.transaction_type == "bonus_claim")
+        features["is_bet_withdrawal"] = float(transaction.transaction_type in ["bet_withdrawal", "withdrawal"])
+
+        # Crypto features
+        features["has_wallet_address"] = float(bool(transaction.wallet_address))
+        features["is_new_wallet"] = float(transaction.is_new_wallet or False)
+        features["wallet_age_days"] = float(transaction.wallet_age_days or 0)
+        features["is_p2p_trade"] = float(transaction.transaction_type == "p2p_trade")
+        features["is_crypto_withdrawal"] = float(transaction.transaction_type == "crypto_withdrawal")
+        features["p2p_count_24h"] = float(velocity.get("p2p_count_24hour", 0))
+
+        # Marketplace features
+        features["has_seller_id"] = float(bool(transaction.seller_id))
+        features["seller_rating"] = float(transaction.seller_rating or 0)
+        features["seller_account_age_days"] = float(transaction.seller_account_age_days or 0)
+        features["is_new_seller"] = float((transaction.seller_account_age_days or 0) < 7)
+        features["is_high_value_item"] = float(transaction.is_high_value_item or False)
+        features["is_high_risk_category"] = float(
+            transaction.product_category and
+            transaction.product_category.lower() in ["electronics", "phones", "gift_cards", "luxury_goods", "gadgets"]
+        )
+
         return features
 
     def _calculate_confidence(self, probability: float) -> float:

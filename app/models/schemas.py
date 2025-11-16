@@ -4,6 +4,56 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, Field, validator
 from decimal import Decimal
+from enum import Enum
+
+
+# Transaction Type Enums
+class TransactionType(str, Enum):
+    """Supported transaction types across all verticals"""
+
+    # Fintech/Lending
+    LOAN_DISBURSEMENT = "loan_disbursement"
+    LOAN_REPAYMENT = "loan_repayment"
+    TRANSFER = "transfer"
+    WITHDRAWAL = "withdrawal"
+    DEPOSIT = "deposit"
+    BILL_PAYMENT = "bill_payment"
+
+    # E-commerce
+    PURCHASE = "purchase"
+    REFUND = "refund"
+    CHARGEBACK = "chargeback"
+    CHECKOUT = "checkout"
+
+    # Betting/Gaming
+    BET_PLACEMENT = "bet_placement"
+    BET_WITHDRAWAL = "bet_withdrawal"
+    BONUS_CLAIM = "bonus_claim"
+    DEPOSIT_BONUS = "deposit_bonus"
+
+    # Crypto
+    CRYPTO_DEPOSIT = "crypto_deposit"
+    CRYPTO_WITHDRAWAL = "crypto_withdrawal"
+    P2P_TRADE = "p2p_trade"
+    SWAP = "swap"
+    STAKING = "staking"
+
+    # Marketplace
+    SELLER_PAYOUT = "seller_payout"
+    BUYER_PAYMENT = "buyer_payment"
+    ESCROW_RELEASE = "escrow_release"
+    MARKETPLACE_WITHDRAWAL = "marketplace_withdrawal"
+
+
+class Industry(str, Enum):
+    """Industry vertical"""
+    FINTECH = "fintech"
+    LENDING = "lending"
+    ECOMMERCE = "ecommerce"
+    BETTING = "betting"
+    GAMING = "gaming"
+    CRYPTO = "crypto"
+    MARKETPLACE = "marketplace"
 
 
 # Request Schemas
@@ -15,12 +65,14 @@ class TransactionCheckRequest(BaseModel):
     amount: float = Field(..., description="Transaction amount in Naira", ge=0)
     transaction_type: str = Field(
         default="loan_disbursement",
-        description="Type of transaction (loan_disbursement, withdrawal, transfer, etc.)"
+        description="Type of transaction (loan_disbursement, purchase, bet_placement, etc.)"
     )
+    industry: Optional[str] = Field(None, description="Industry vertical (fintech, ecommerce, betting, crypto, marketplace)")
 
     # Device and network info
     device_id: Optional[str] = Field(None, description="Device identifier")
     ip_address: Optional[str] = Field(None, description="IP address of transaction")
+    user_agent: Optional[str] = Field(None, description="Browser user agent")
 
     # Account info
     account_age_days: Optional[int] = Field(None, description="Age of account in days", ge=0)
@@ -29,6 +81,7 @@ class TransactionCheckRequest(BaseModel):
     # Contact changes
     phone_changed_recently: Optional[bool] = Field(False, description="Phone changed in last 48 hours")
     email_changed_recently: Optional[bool] = Field(False, description="Email changed in last 48 hours")
+    address_changed_recently: Optional[bool] = Field(False, description="Address changed in last 7 days")
 
     # Optional PII (will be hashed)
     bvn: Optional[str] = Field(None, description="Bank Verification Number (will be hashed)")
@@ -46,6 +99,33 @@ class TransactionCheckRequest(BaseModel):
     dormant_days: Optional[int] = Field(None, description="Days since last activity", ge=0)
     previous_fraud_count: Optional[int] = Field(0, description="Number of previous fraud cases", ge=0)
 
+    # E-commerce specific fields
+    card_bin: Optional[str] = Field(None, description="First 6 digits of card number")
+    card_last4: Optional[str] = Field(None, description="Last 4 digits of card")
+    card_type: Optional[str] = Field(None, description="Card type (debit, credit)")
+    payment_method: Optional[str] = Field(None, description="Payment method (card, transfer, wallet)")
+    shipping_address_matches_billing: Optional[bool] = Field(None, description="Address match flag")
+    is_digital_goods: Optional[bool] = Field(None, description="Digital vs physical goods")
+
+    # Betting/Gaming specific fields
+    bet_count_today: Optional[int] = Field(None, description="Number of bets today", ge=0)
+    bonus_balance: Optional[float] = Field(None, description="Current bonus balance", ge=0)
+    withdrawal_count_today: Optional[int] = Field(None, description="Withdrawals today", ge=0)
+    bet_pattern_unusual: Optional[bool] = Field(None, description="Unusual betting pattern detected")
+
+    # Crypto specific fields
+    wallet_address: Optional[str] = Field(None, description="Crypto wallet address")
+    blockchain: Optional[str] = Field(None, description="Blockchain network (bitcoin, ethereum, etc)")
+    is_new_wallet: Optional[bool] = Field(None, description="First time using this wallet")
+    wallet_age_days: Optional[int] = Field(None, description="Age of wallet in days", ge=0)
+
+    # Marketplace specific fields
+    seller_id: Optional[str] = Field(None, description="Seller identifier")
+    seller_rating: Optional[float] = Field(None, description="Seller rating 0-5", ge=0, le=5)
+    seller_account_age_days: Optional[int] = Field(None, description="Seller account age", ge=0)
+    product_category: Optional[str] = Field(None, description="Product category")
+    is_high_value_item: Optional[bool] = Field(None, description="Item value >₦100k")
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -53,6 +133,7 @@ class TransactionCheckRequest(BaseModel):
                 "user_id": "user_789",
                 "amount": 250000,
                 "transaction_type": "loan_disbursement",
+                "industry": "lending",
                 "device_id": "abc123",
                 "ip_address": "197.210.226.45",
                 "account_age_days": 3,
