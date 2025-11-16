@@ -12,6 +12,7 @@ import {
   Bell,
   User,
   Zap,
+  Network,
 } from 'lucide-react'
 import APIHealthIndicator from './APIHealthIndicator'
 import RateLimitBadge from './RateLimitBadge'
@@ -24,6 +25,7 @@ interface LayoutProps {
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Transactions', href: '/transactions', icon: List },
+  { name: 'Consortium', href: '/consortium', icon: Network },
   { name: 'Test Playground', href: '/test', icon: Zap },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },

@@ -7,6 +7,7 @@ import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
 import Login from './pages/Login'
 import TestPlayground from './pages/TestPlayground'
+import ConsortiumDashboard from './pages/ConsortiumDashboard'
 
 function App() {
   // In production, check actual auth state
@@ -36,6 +37,10 @@ function App() {
             <Route
               path="/test"
               element={isAuthenticated ? <TestPlayground /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/consortium"
+              element={isAuthenticated ? <ConsortiumDashboard /> : <Navigate to="/login" />}
             />
             <Route
               path="/settings"
