@@ -11,6 +11,7 @@ import {
   X,
   Bell,
   User,
+  Zap,
 } from 'lucide-react'
 
 interface LayoutProps {
@@ -20,6 +21,7 @@ interface LayoutProps {
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Transactions', href: '/transactions', icon: List },
+  { name: 'Test Playground', href: '/test', icon: Zap },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]
