@@ -95,14 +95,22 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Check if Redis is available
         # If Redis is down, we allow requests through (fail-open)
         # This prevents rate limiter from breaking the entire API
-        if not self.redis or not self.redis.redis:
+        if not self.redis:
             # Redis not available, allow request through
+            return await call_next(request)
+
+        # Check if Redis client is healthy
+        try:
+            if not self.redis.health_check():
+                return await call_next(request)
+        except:
+            # Redis connection failed, allow request through
             return await call_next(request)
 
         try:
             # Check rate limit for this API key
             # Returns True if allowed, False if rate limit exceeded
-            allowed, remaining, reset_time = await self._check_rate_limit(api_key)
+            allowed, remaining, reset_time = self._check_rate_limit(api_key)
 
             if not allowed:
                 # Rate limit exceeded - return 429 error
@@ -138,7 +146,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             print(f"Rate limiting error: {e}")
             return await call_next(request)
 
-    async def _check_rate_limit(self, api_key: str) -> tuple[bool, int, int]:
+    def _check_rate_limit(self, api_key: str) -> tuple[bool, int, int]:
         """
         Check if API key has exceeded rate limit
 
@@ -172,13 +180,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         try:
             # Get current request count from Redis
             # Returns None if key doesn't exist (first request)
-            current = await self.redis.get(redis_key)
+            current = self.redis.client.get(redis_key)
             current_count = int(current) if current else 0
 
             # Check if limit exceeded
             if current_count >= limit:
                 # Get remaining TTL (time until reset)
-                ttl = await self.redis.redis.ttl(redis_key)
+                ttl = self.redis.client.ttl(redis_key)
                 reset_time = ttl if ttl > 0 else self.window_seconds
 
                 # Return: not allowed, 0 remaining, seconds until reset
@@ -186,18 +194,18 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
             # Increment counter
             # If key doesn't exist, this creates it with value 1
-            new_count = await self.redis.redis.incr(redis_key)
+            new_count = self.redis.client.incr(redis_key)
 
             # Set expiration on first request
             # After 60 seconds, counter resets to 0
             if new_count == 1:
-                await self.redis.redis.expire(redis_key, self.window_seconds)
+                self.redis.client.expire(redis_key, self.window_seconds)
 
             # Calculate remaining requests
             remaining = limit - new_count
 
             # Get TTL for reset time
-            ttl = await self.redis.redis.ttl(redis_key)
+            ttl = self.redis.client.ttl(redis_key)
             reset_time = ttl if ttl > 0 else self.window_seconds
 
             # Return: allowed, remaining requests, seconds until reset
