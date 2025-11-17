@@ -24,10 +24,24 @@ from app.services.redis_service import RedisService
 # All endpoints defined below will be under /api/v1/
 router = APIRouter()
 
-# Initialize services
+# Initialize services lazily (on-demand) to avoid startup failures
 # These will be injected into endpoints via dependency injection
-redis_service = RedisService()
-cache_service = CacheService(redis_service)
+redis_service = None
+cache_service = None
+
+def get_cache_service():
+    """Get cache service singleton (lazy initialization)"""
+    global redis_service, cache_service
+    if cache_service is None:
+        try:
+            redis_service = RedisService()
+            cache_service = CacheService(redis_service)
+        except Exception as e:
+            print(f"Warning: Could not initialize cache service: {e}")
+            print("Continuing without cache (Redis may not be running)")
+            # Return None - endpoints will handle gracefully
+            return None
+    return cache_service
 
 
 @router.post("/check-transaction", response_model=TransactionCheckResponse)
@@ -83,19 +97,24 @@ async def check_transaction(
     ```
     """
     try:
-        # Step 1: Check cache first (fastest path)
+        # Step 1: Check cache first (fastest path) - if Redis is available
         # Convert Pydantic model to dict for caching
         transaction_dict = transaction.dict()
 
-        # Try to get cached result
-        # If found, return immediately (5ms response)
-        cached_result = await cache_service.get_cached_result(transaction_dict)
-        if cached_result:
-            # Cache hit! Return cached result
-            # This saved us ~82ms of processing time
-            return TransactionCheckResponse(**cached_result)
+        # Get cache service (may be None if Redis not available)
+        cache = get_cache_service()
+        cached_result = None
 
-        # Step 2: Cache miss - process fraud check normally
+        # Try to get cached result only if cache is available
+        # If found, return immediately (5ms response)
+        if cache:
+            cached_result = await cache.get_cached_result(transaction_dict)
+            if cached_result:
+                # Cache hit! Return cached result
+                # This saved us ~82ms of processing time
+                return TransactionCheckResponse(**cached_result)
+
+        # Step 2: Cache miss (or no cache) - process fraud check normally
         # Initialize fraud detector with database connection
         detector = FraudDetector(db=db, client_id=client.client_id)
 
@@ -107,13 +126,14 @@ async def check_transaction(
         # - Velocity tracking
         result = detector.check_transaction(transaction)
 
-        # Step 3: Cache the result for future requests
+        # Step 3: Cache the result for future requests (if cache is available)
         # Convert result to dict for caching
         result_dict = result.dict() if hasattr(result, 'dict') else result
 
-        # Store in cache (expires in 5 minutes)
+        # Store in cache (expires in 5 minutes) - only if cache is available
         # Future identical requests will get 5ms response
-        await cache_service.set_cached_result(transaction_dict, result_dict)
+        if cache:
+            await cache.set_cached_result(transaction_dict, result_dict)
 
         # Return the result
         return result

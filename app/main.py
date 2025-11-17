@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from datetime import datetime
 import time
+from sqlalchemy import text
 
 from app.core.config import settings
 from app.api.v1.api import api_router
@@ -131,16 +132,23 @@ async def health_check():
     database_status = "ok"
     redis_status = "ok"
 
+    # Check database connectivity
     try:
         from app.db.session import SessionLocal
         db = SessionLocal()
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         db.close()
     except Exception as e:
         database_status = f"error: {str(e)}"
 
-    # Redis check would go here
-    # For now, assume ok
+    # Check Redis connectivity (optional)
+    try:
+        from app.services.redis_service import get_redis_service
+        redis = get_redis_service()
+        if not redis.health_check():
+            redis_status = "error: Redis not responding"
+    except Exception as e:
+        redis_status = f"error: {str(e)}"
 
     overall_status = "ok" if database_status == "ok" and redis_status == "ok" else "degraded"
 
