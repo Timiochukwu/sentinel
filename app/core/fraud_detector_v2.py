@@ -58,6 +58,59 @@ class EnhancedFraudDetector:
         """
         start_time = time.time()
 
+        # Check if this transaction was already processed (idempotent)
+        # If the same transaction_id is submitted twice, return the cached result
+        # This prevents duplicate processing and database constraint violations
+        from app.models.database import Transaction as TransactionModel
+        existing_transaction = self.db.query(TransactionModel).filter(
+            TransactionModel.transaction_id == transaction.transaction_id,
+            TransactionModel.client_id == self.client_id
+        ).first()
+
+        if existing_transaction:
+            # Transaction already processed - return existing result
+            # This makes the API idempotent (same request = same response)
+            from app.models.schemas import FraudFlag
+
+            flags = []
+            if existing_transaction.flags:
+                flags = [
+                    FraudFlag(
+                        type=flag.get("type"),
+                        severity=flag.get("severity"),
+                        message=flag.get("message"),
+                        score=flag.get("score"),
+                        confidence=flag.get("confidence"),
+                        metadata=flag.get("metadata")
+                    )
+                    for flag in existing_transaction.flags
+                ]
+
+            # Generate recommendation based on existing decision
+            recommendation = self._generate_recommendation(
+                existing_transaction.decision,
+                existing_transaction.risk_level
+            )
+
+            logger.info(
+                "Returning cached result for duplicate transaction",
+                extra={
+                    "transaction_id": transaction.transaction_id,
+                    "risk_score": existing_transaction.risk_score
+                }
+            )
+
+            return TransactionCheckResponse(
+                transaction_id=existing_transaction.transaction_id,
+                risk_score=existing_transaction.risk_score,
+                risk_level=existing_transaction.risk_level,
+                decision=existing_transaction.decision,
+                flags=flags,
+                recommendation=recommendation,
+                processing_time_ms=existing_transaction.processing_time_ms,
+                _cached=True  # Indicate this is a cached result
+            )
+
         logger.info(
             "Starting fraud detection",
             extra={

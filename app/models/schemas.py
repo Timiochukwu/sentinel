@@ -364,6 +364,12 @@ class TransactionCheckResponse(BaseModel):
         description="Alerts from consortium intelligence (e.g., 'Applied to 3 other lenders this week')"
     )
 
+    # Cache indicator (only included if this is a cached/duplicate transaction result)
+    _cached: Optional[bool] = Field(
+        None,
+        description="True if this result was retrieved from cache or duplicate transaction check"
+    )
+
     class Config:
         json_schema_extra = {
             "example": {
