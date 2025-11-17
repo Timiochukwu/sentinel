@@ -3,6 +3,7 @@
 
 import secrets
 import sys
+from datetime import datetime
 sys.path.insert(0, '/home/user/sentinel')
 
 from sqlalchemy import create_engine, text
@@ -37,14 +38,17 @@ def create_test_client():
         insert_query = text("""
             INSERT INTO clients (
                 client_id, company_name, contact_email, contact_phone,
-                plan, status, api_key, api_rate_limit, webhook_url
+                plan, status, api_key, api_rate_limit, webhook_url,
+                created_at, updated_at
             ) VALUES (
                 :client_id, :company_name, :contact_email, :contact_phone,
-                :plan, :status, :api_key, :api_rate_limit, :webhook_url
+                :plan, :status, :api_key, :api_rate_limit, :webhook_url,
+                :created_at, :updated_at
             )
             RETURNING id, api_key
         """)
 
+        now = datetime.utcnow()
         result = conn.execute(insert_query, {
             'client_id': 'demo-client',
             'company_name': 'Demo Company',
@@ -54,7 +58,9 @@ def create_test_client():
             'status': 'active',
             'api_key': api_key,
             'api_rate_limit': 10000,
-            'webhook_url': 'https://example.com/webhook'
+            'webhook_url': 'https://example.com/webhook',
+            'created_at': now,
+            'updated_at': now
         })
 
         row = result.fetchone()
