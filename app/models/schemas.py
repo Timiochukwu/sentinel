@@ -365,7 +365,7 @@ class TransactionCheckResponse(BaseModel):
     )
 
     # Cache indicator (only included if this is a cached/duplicate transaction result)
-    _cached: Optional[bool] = Field(
+    cached: Optional[bool] = Field(
         None,
         description="True if this result was retrieved from cache or duplicate transaction check"
     )

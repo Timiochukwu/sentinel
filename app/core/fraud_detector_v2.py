@@ -108,7 +108,7 @@ class EnhancedFraudDetector:
                 flags=flags,
                 recommendation=recommendation,
                 processing_time_ms=existing_transaction.processing_time_ms,
-                _cached=True  # Indicate this is a cached result
+                cached=True  # Indicate this is a cached result
             )
 
         logger.info(

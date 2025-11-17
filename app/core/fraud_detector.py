@@ -175,7 +175,7 @@ class FraudDetector:
                 flags=flags,
                 recommendation=recommendation,
                 processing_time_ms=existing_transaction.processing_time_ms,
-                _cached=True  # Indicate this is a cached result
+                cached=True  # Indicate this is a cached result
             )
 
         # Step 1: Build context - gather background information
