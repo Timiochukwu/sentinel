@@ -163,8 +163,10 @@ class FraudDetector:
 
             # Generate recommendation based on existing decision
             recommendation = self._generate_recommendation(
+                existing_transaction.risk_level,
                 existing_transaction.decision,
-                existing_transaction.risk_level
+                flags,
+                []  # No consortium alerts for cached results
             )
 
             return TransactionCheckResponse(
