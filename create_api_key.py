@@ -39,10 +39,16 @@ def create_test_client():
             INSERT INTO clients (
                 client_id, company_name, contact_email, contact_phone,
                 plan, status, api_key, api_rate_limit, webhook_url,
+                risk_threshold_high, risk_threshold_medium,
+                total_checks, total_fraud_caught, total_amount_saved,
+                ml_enabled, ml_weight,
                 created_at, updated_at
             ) VALUES (
                 :client_id, :company_name, :contact_email, :contact_phone,
                 :plan, :status, :api_key, :api_rate_limit, :webhook_url,
+                :risk_threshold_high, :risk_threshold_medium,
+                :total_checks, :total_fraud_caught, :total_amount_saved,
+                :ml_enabled, :ml_weight,
                 :created_at, :updated_at
             )
             RETURNING id, api_key
@@ -59,6 +65,13 @@ def create_test_client():
             'api_key': api_key,
             'api_rate_limit': 10000,
             'webhook_url': 'https://example.com/webhook',
+            'risk_threshold_high': 70,
+            'risk_threshold_medium': 40,
+            'total_checks': 0,
+            'total_fraud_caught': 0,
+            'total_amount_saved': 0,
+            'ml_enabled': True,
+            'ml_weight': 0.7,
             'created_at': now,
             'updated_at': now
         })
