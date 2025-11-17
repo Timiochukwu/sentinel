@@ -27,6 +27,8 @@ class Transaction(Base):
 
     # Detection inputs
     device_id = Column(String(255))
+    device_fingerprint = Column(String(255), index=True)  # Stable browser fingerprint for fraud detection
+    fingerprint_components = Column(JSONB)  # Detailed fingerprint data for forensics
     ip_address = Column(INET)
     account_age_days = Column(Integer)
     transaction_count = Column(Integer)
@@ -66,6 +68,8 @@ class Transaction(Base):
         Index('idx_risk_level', 'risk_level'),
         Index('idx_decision', 'decision'),
         Index('idx_is_fraud', 'is_fraud'),
+        Index('idx_device_fingerprint', 'device_fingerprint'),  # For loan stacking detection
+        Index('idx_fingerprint_client', 'device_fingerprint', 'client_id'),  # For consortium detection
     )
 
 

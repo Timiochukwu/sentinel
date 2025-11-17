@@ -26,6 +26,7 @@ from app.models.schemas import TransactionCheckRequest, TransactionCheckResponse
 from app.models.database import Transaction, Client
 from app.services.rules import FraudRulesEngine
 from app.services.consortium import ConsortiumService
+from app.services.fingerprint_rules import FingerprintFraudRules
 from app.core.security import hash_device_id, hash_bvn, hash_phone, hash_email
 from app.core.config import settings
 
@@ -71,6 +72,9 @@ class FraudDetector:
 
         # Initialize fraud rules engine (contains all 29 detection rules)
         self.rules_engine = FraudRulesEngine()
+
+        # Initialize device fingerprint fraud detector (catches loan stacking)
+        self.fingerprint_rules = FingerprintFraudRules()
 
         # Initialize consortium service (cross-lender intelligence)
         # This checks if the user has applied to other lenders recently
@@ -141,6 +145,41 @@ class FraudDetector:
         risk_score, risk_level, decision, flags = self.rules_engine.evaluate(
             transaction, context
         )
+
+        # Step 2.5: Run device fingerprint fraud rules (NEW!)
+        # Check for loan stacking, high velocity, fraud history, and consortium patterns
+        # These rules are specifically designed to catch Nigerian loan stacking fraud
+        if transaction.device_fingerprint:
+            fingerprint_flags = self.fingerprint_rules.check_fingerprint_fraud(
+                fingerprint=transaction.device_fingerprint,
+                user_id=transaction.user_id,
+                client_id=self.client_id,
+                db=self.db,
+                amount=transaction.amount
+            )
+
+            # Merge fingerprint flags with existing flags
+            if fingerprint_flags:
+                # Convert fingerprint flag dicts to FraudFlag objects
+                for fp_flag in fingerprint_flags:
+                    flags.append(FraudFlag(**fp_flag))
+
+                # Recalculate risk score with fingerprint flags included
+                risk_score = sum(flag.score for flag in flags)
+
+                # Ensure risk score doesn't exceed 100
+                risk_score = min(risk_score, 100)
+
+                # Recalculate risk level based on new risk score
+                if risk_score >= 70:
+                    risk_level = "high"
+                    decision = "decline"
+                elif risk_score >= 40:
+                    risk_level = "medium"
+                    decision = "review"
+                else:
+                    risk_level = "low"
+                    decision = "approve"
 
         # Step 3: Extract consortium intelligence
         # Consortium = shared intelligence across multiple lenders
@@ -720,6 +759,8 @@ class FraudDetector:
 
             # Device and network info (hashed for privacy)
             device_id=device_hash,              # SHA-256 hash of device ID
+            device_fingerprint=transaction.device_fingerprint,  # Browser fingerprint from FingerprintJS
+            fingerprint_components=transaction.fingerprint_components,  # Detailed fingerprint data for forensics
             ip_address=transaction.ip_address,  # IP addresses are not considered PII
 
             # Account information

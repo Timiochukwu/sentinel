@@ -24,6 +24,7 @@ import { Upload, FileText, Download, X } from 'lucide-react'
 import { fraudAPI } from '../lib/api'
 import { toast } from './Toast'
 import { exportToCSV } from '../utils/export'
+import { getDeviceFingerprint } from '../utils/fingerprint'
 
 export default function BatchUpload({ onComplete }: { onComplete?: (results: any) => void }) {
   const [file, setFile] = useState<File | null>(null)
@@ -127,11 +128,23 @@ export default function BatchUpload({ onComplete }: { onComplete?: (results: any
         throw new Error('Maximum 100 transactions per batch. Please split your file.')
       }
 
+      // Collect device fingerprint (same for all transactions in this batch)
+      toast.info('Collecting device fingerprint...')
+      setProgress(25)
+      const fingerprintData = await getDeviceFingerprint()
+
+      // Add fingerprint to each transaction
+      const transactionsWithFingerprint = transactions.map(txn => ({
+        ...txn,
+        device_fingerprint: fingerprintData.fingerprint,
+        fingerprint_components: fingerprintData.components
+      }))
+
       toast.info(`Processing ${transactions.length} transactions...`)
 
       // Send to batch API
       setProgress(50)
-      const result = await fraudAPI.checkTransactionsBatch(transactions)
+      const result = await fraudAPI.checkTransactionsBatch(transactionsWithFingerprint)
 
       setProgress(100)
       setResults(result)

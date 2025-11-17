@@ -186,6 +186,8 @@ class TransactionCheckRequest(BaseModel):
 
     # Device and network info
     device_id: Optional[str] = Field(None, description="Device identifier")
+    device_fingerprint: Optional[str] = Field(None, description="Browser fingerprint hash from FingerprintJS (for loan stacking detection)")
+    fingerprint_components: Optional[Dict[str, Any]] = Field(None, description="Detailed fingerprint components (screen, canvas, WebGL, etc.)")
     ip_address: Optional[str] = Field(None, description="IP address of transaction")
     user_agent: Optional[str] = Field(None, description="Browser user agent")
 

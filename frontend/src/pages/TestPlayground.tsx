@@ -18,6 +18,7 @@ import { Play, AlertTriangle, CheckCircle2, Info, Copy } from 'lucide-react'
 import Layout from '../components/Layout'
 import { fraudAPI } from '../lib/api'
 import { toast } from '../components/Toast'
+import { getDeviceFingerprint } from '../utils/fingerprint'
 
 // Sample transaction scenarios
 const SAMPLE_SCENARIOS = {
@@ -108,16 +109,32 @@ export default function TestPlayground() {
       // Parse JSON input
       const transaction = JSON.parse(transactionData)
 
-      // Call fraud detection API
+      // STEP 1: Collect device fingerprint for loan stacking detection
+      // This generates a unique identifier for this browser/device
+      toast.info('Collecting device fingerprint...')
+      const fingerprintData = await getDeviceFingerprint()
+
+      // STEP 2: Add fingerprint to transaction data
+      // The backend will use this to detect:
+      // - Multiple users on same device (loan stacking)
+      // - High velocity automated attacks
+      // - Devices with fraud history
+      // - Cross-lender fraud patterns (consortium)
+      transaction.device_fingerprint = fingerprintData.fingerprint
+      transaction.fingerprint_components = fingerprintData.components
+
+      // Call fraud detection API with fingerprint included
       const response = await fraudAPI.checkTransaction(transaction)
 
       setResult(response)
+      toast.success('Fraud check complete!')
     } catch (err: any) {
       if (err instanceof SyntaxError) {
         setError('Invalid JSON format. Please check your input.')
         toast.error('Invalid JSON format')
       } else {
         setError(err.message || 'Failed to check transaction')
+        toast.error(err.message || 'Failed to check transaction')
       }
     } finally {
       setLoading(false)
