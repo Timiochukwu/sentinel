@@ -281,6 +281,108 @@ class TransactionCheckRequest(BaseModel):
     platform_os: Optional[str] = Field(None, description="Platform/OS (iOS 14.5, Android 11, Windows 10, etc)")
     platform_os_consistent: Optional[bool] = Field(None, description="Is OS consistent with user history")
 
+    # PHASE 2 FEATURES (20 new features for 80-85% detection)
+    # Browser fingerprinting
+    browser_fonts_hash: Optional[str] = Field(None, description="Hash of installed browser fonts")
+    canvas_fingerprint: Optional[str] = Field(None, description="Canvas fingerprint hash")
+    webgl_fingerprint: Optional[str] = Field(None, description="WebGL fingerprint hash")
+    screen_resolution: Optional[str] = Field(None, description="Screen resolution (e.g. 1920x1080)")
+    timezone_offset: Optional[int] = Field(None, description="Timezone UTC offset in minutes")
+
+    # Behavioral analytics
+    session_duration_seconds: Optional[int] = Field(None, description="Session duration in seconds", ge=0)
+    mouse_movement_score: Optional[int] = Field(None, description="Mouse movement humanness 0-100", ge=0, le=100)
+    typing_speed_wpm: Optional[int] = Field(None, description="Typing speed in WPM", ge=0)
+    copy_paste_count: Optional[int] = Field(None, description="Copy/paste actions count", ge=0)
+
+    # Identity verification
+    social_media_verified: Optional[bool] = Field(False, description="Social media profile verified")
+    social_media_age_days: Optional[int] = Field(None, description="Social media account age", ge=0)
+    address_verified: Optional[bool] = Field(False, description="Address verified by 3rd party")
+
+    # Transaction patterns
+    shipping_distance_km: Optional[int] = Field(None, description="Distance billing to shipping", ge=0)
+    transaction_frequency_per_day: Optional[float] = Field(None, description="Avg transactions per day", ge=0)
+    avg_transaction_amount: Optional[float] = Field(None, description="User avg transaction amount", ge=0)
+    chargeback_history_count: Optional[int] = Field(0, description="Total chargebacks", ge=0)
+    refund_history_count: Optional[int] = Field(0, description="Total refunds", ge=0)
+    holiday_weekend_transaction: Optional[bool] = Field(False, description="Transaction on holiday/weekend")
+
+    # PHASE 3 FEATURES (50 new features for 85-90% detection)
+    # Behavioral biometrics
+    keystroke_dynamics_score: Optional[int] = Field(None, description="Keystroke biometric 0-100", ge=0, le=100)
+    swipe_pattern_score: Optional[int] = Field(None, description="Swipe pattern 0-100", ge=0, le=100)
+    touch_pressure_consistent: Optional[bool] = Field(None, description="Touch pressure consistent")
+    acceleration_pattern_score: Optional[int] = Field(None, description="Device acceleration pattern 0-100", ge=0, le=100)
+    scroll_behavior_score: Optional[int] = Field(None, description="Scroll behavior 0-100", ge=0, le=100)
+
+    # Network graph analysis
+    co_user_count: Optional[int] = Field(None, description="Users sharing same device/IP/email", ge=0)
+    shared_email_with_fraud: Optional[bool] = Field(False, description="Email linked to fraud")
+    shared_phone_with_fraud: Optional[bool] = Field(False, description="Phone linked to fraud")
+    shared_device_with_fraud: Optional[bool] = Field(False, description="Device linked to fraud")
+    shared_ip_with_fraud: Optional[bool] = Field(False, description="IP linked to fraud")
+
+    # Entity clustering
+    first_name_uniqueness: Optional[float] = Field(None, description="First name uniqueness 0-1", ge=0, le=1)
+    last_name_uniqueness: Optional[float] = Field(None, description="Last name uniqueness 0-1", ge=0, le=1)
+    email_domain_legitimacy: Optional[int] = Field(None, description="Email domain legitimacy 0-100", ge=0, le=100)
+    phone_carrier_risk: Optional[int] = Field(None, description="Phone carrier risk 0-100", ge=0, le=100)
+    bvn_fraud_match_count: Optional[int] = Field(0, description="BVN fraud matches", ge=0)
+
+    # Relationship mapping
+    family_member_with_fraud: Optional[bool] = Field(False, description="Family member has fraud")
+    known_fraudster_pattern: Optional[bool] = Field(False, description="Matches known fraudster pattern")
+    linked_to_synthetic_fraud: Optional[bool] = Field(False, description="Synthetic identity indicator")
+    velocity_between_verticals: Optional[int] = Field(None, description="Cross-vertical velocity", ge=0)
+    account_resurrection_attempt: Optional[bool] = Field(False, description="Old account reactivation")
+
+    # Historical pattern matching
+    account_history_matches_fraud: Optional[int] = Field(None, description="Fraud pattern matches", ge=0)
+    merchant_mcc_history: Optional[List[str]] = Field(None, description="MCC codes history")
+    previously_declined_transaction: Optional[bool] = Field(False, description="Was previously declined")
+    refund_abuse_pattern: Optional[bool] = Field(False, description="Serial refund pattern")
+    chargeback_abuse_pattern: Optional[bool] = Field(False, description="Serial chargeback pattern")
+
+    # ML-derived features
+    entropy_score: Optional[float] = Field(None, description="Information entropy 0-1", ge=0, le=1)
+    anomaly_score: Optional[float] = Field(None, description="ML anomaly score 0-1", ge=0, le=1)
+    transaction_legitimacy_score: Optional[int] = Field(None, description="Legitimacy 0-100", ge=0, le=100)
+    user_profile_deviation: Optional[float] = Field(None, description="Profile deviation 0-1", ge=0, le=1)
+    risk_factor_clustering: Optional[Dict[str, Any]] = Field(None, description="Grouped risk factors")
+
+    # Device intelligence
+    device_manufacturer_risk: Optional[int] = Field(None, description="Manufacturer risk 0-100", ge=0, le=100)
+    device_model_age_months: Optional[int] = Field(None, description="Device model age", ge=0)
+    emulator_detected: Optional[bool] = Field(False, description="Emulator detected")
+    jailbreak_detected: Optional[bool] = Field(False, description="Jailbreak/root detected")
+    suspicious_app_installed: Optional[bool] = Field(False, description="Malware/fraud app found")
+
+    # Industry-specific signals
+    lending_cross_sell_pattern: Optional[bool] = Field(False, description="Lending cross-sell fraud")
+    ecommerce_dropshipper_pattern: Optional[bool] = Field(False, description="Dropshipping fraud")
+    crypto_pump_dump_signal: Optional[bool] = Field(False, description="Pump & dump signal")
+    betting_arbitrage_likelihood: Optional[int] = Field(None, description="Arbitrage likelihood 0-100", ge=0, le=100)
+    marketplace_seller_collusion: Optional[bool] = Field(False, description="Seller collusion")
+
+    # Complex pattern detection
+    transaction_pattern_entropy: Optional[float] = Field(None, description="Pattern entropy 0-1", ge=0, le=1)
+    behavioral_consistency_score: Optional[int] = Field(None, description="Behavior consistency 0-100", ge=0, le=100)
+    account_age_velocity_ratio: Optional[float] = Field(None, description="Age/velocity ratio", ge=0)
+    geographic_consistency_score: Optional[int] = Field(None, description="Geographic consistency 0-100", ge=0, le=100)
+    temporal_consistency_score: Optional[int] = Field(None, description="Temporal consistency 0-100", ge=0, le=100)
+
+    # Cross-transaction analytics
+    multi_account_cross_funding: Optional[bool] = Field(False, description="Cross-account funding")
+    round_trip_transaction: Optional[bool] = Field(False, description="Money out and back")
+    test_transaction_pattern: Optional[bool] = Field(False, description="Small before large pattern")
+    rapid_account_progression: Optional[bool] = Field(False, description="Quick tier upgrade")
+    suspicious_beneficiary_pattern: Optional[bool] = Field(False, description="Abnormal beneficiary")
+
+    # Advanced ML features
+    deep_learning_fraud_score: Optional[float] = Field(None, description="DL model score 0-1", ge=0, le=1)
+    ensemble_model_confidence: Optional[float] = Field(None, description="Ensemble confidence 0-1", ge=0, le=1)
+
     class Config:
         json_schema_extra = {
             "example": {

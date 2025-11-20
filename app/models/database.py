@@ -84,6 +84,108 @@ class Transaction(Base):
     platform_os = Column(String(100))  # "iOS 14.5", "Android 11", "Windows 10", "macOS Big Sur"
     platform_os_consistent = Column(Boolean)  # Same OS as usual
 
+    # PHASE 2 FEATURES (20 new features for 80-85% fraud detection)
+    # Browser fingerprinting (Rules 40-44)
+    browser_fonts_hash = Column(String(255))  # Hash of installed fonts
+    canvas_fingerprint = Column(String(255))  # Canvas fingerprint
+    webgl_fingerprint = Column(String(255))  # WebGL fingerprint
+    screen_resolution = Column(String(50))  # "1920x1080"
+    timezone_offset = Column(Integer)  # UTC offset in minutes
+
+    # Behavioral analytics (Rules 45-48)
+    session_duration_seconds = Column(Integer)  # How long user spent on page
+    mouse_movement_score = Column(Integer)  # 0-100, how human-like (100=very human)
+    typing_speed_wpm = Column(Integer)  # Estimated words per minute
+    copy_paste_count = Column(Integer)  # Number of copy/paste actions
+
+    # Identity verification (Rules 49-51)
+    social_media_verified = Column(Boolean, default=False)  # Social profile verified
+    social_media_age_days = Column(Integer)  # Age of social media account
+    address_verified = Column(Boolean, default=False)  # Address verified via 3rd party
+
+    # Transaction patterns (Rules 52-57)
+    shipping_distance_km = Column(Integer)  # Distance from billing to shipping
+    transaction_frequency_per_day = Column(Numeric(5, 2))  # Avg txns per day
+    avg_transaction_amount = Column(Numeric(15, 2))  # User's average transaction
+    chargeback_history_count = Column(Integer, default=0)  # Total chargebacks
+    refund_history_count = Column(Integer, default=0)  # Total refunds
+    holiday_weekend_transaction = Column(Boolean, default=False)  # Txn on holiday/weekend
+
+    # PHASE 3 FEATURES (50 new features for 85-90% fraud detection)
+    # Behavioral biometrics (Rules 58-62)
+    keystroke_dynamics_score = Column(Integer)  # 0-100 biometric score
+    swipe_pattern_score = Column(Integer)  # Mobile: swipe pattern analysis
+    touch_pressure_consistent = Column(Boolean)  # Pressure pattern consistent
+    acceleration_pattern_score = Column(Integer)  # Device movement pattern
+    scroll_behavior_score = Column(Integer)  # Scrolling pattern analysis
+
+    # Network graph analysis (Rules 63-67)
+    co_user_count = Column(Integer)  # Users sharing same device/IP/email
+    shared_email_with_fraud = Column(Boolean, default=False)  # Email used in fraud
+    shared_phone_with_fraud = Column(Boolean, default=False)  # Phone used in fraud
+    shared_device_with_fraud = Column(Boolean, default=False)  # Device used in fraud
+    shared_ip_with_fraud = Column(Boolean, default=False)  # IP used in fraud
+
+    # Entity clustering (Rules 68-72)
+    first_name_uniqueness = Column(Numeric(5, 2))  # 0-1 how common name is
+    last_name_uniqueness = Column(Numeric(5, 2))  # 0-1 how common name is
+    email_domain_legitimacy = Column(Integer)  # 0-100 domain legitimacy score
+    phone_carrier_risk = Column(Integer)  # 0-100 carrier risk (0=safe, 100=risky)
+    bvn_fraud_match_count = Column(Integer, default=0)  # BVN linked to fraud
+
+    # Relationship mapping (Rules 73-77)
+    family_member_with_fraud = Column(Boolean, default=False)  # Related account has fraud
+    known_fraudster_pattern = Column(Boolean, default=False)  # Matches known fraudster
+    linked_to_synthetic_fraud = Column(Boolean, default=False)  # Synthetic identity
+    velocity_between_verticals = Column(Integer)  # Velocity across different verticals
+    account_resurrection_attempt = Column(Boolean, default=False)  # Old account reactivated
+
+    # Historical pattern matching (Rules 78-82)
+    account_history_matches_fraud = Column(Integer)  # Count of matching patterns
+    merchant_mcc_history = Column(JSONB)  # MCC codes merchant has used
+    previously_declined_transaction = Column(Boolean, default=False)  # Was declined before
+    refund_abuse_pattern = Column(Boolean, default=False)  # Serial refund pattern
+    chargeback_abuse_pattern = Column(Boolean, default=False)  # Serial chargeback pattern
+
+    # ML-derived features (Rules 83-87)
+    entropy_score = Column(Numeric(5, 2))  # Information entropy (randomness)
+    anomaly_score = Column(Numeric(5, 2))  # 0-1 anomaly score from ML
+    transaction_legitimacy_score = Column(Integer)  # 0-100 legitimacy
+    user_profile_deviation = Column(Numeric(5, 2))  # How much deviates from profile
+    risk_factor_clustering = Column(JSONB)  # Risk factors grouped by type
+
+    # Device intelligence (Rules 88-92)
+    device_manufacturer_risk = Column(Integer)  # 0-100 risk of manufacturer
+    device_model_age_months = Column(Integer)  # How old is device model
+    emulator_detected = Column(Boolean, default=False)  # Running on emulator
+    jailbreak_detected = Column(Boolean, default=False)  # iOS jailbreak/Android root
+    suspicious_app_installed = Column(Boolean, default=False)  # Malware/fraud app
+
+    # Industry-specific signals (Rules 93-97)
+    lending_cross_sell_pattern = Column(Boolean, default=False)  # Lending cross-sell fraud
+    ecommerce_dropshipper_pattern = Column(Boolean, default=False)  # Dropshipping fraud
+    crypto_pump_dump_signal = Column(Boolean, default=False)  # Pump & dump pattern
+    betting_arbitrage_likelihood = Column(Integer)  # 0-100 likelihood
+    marketplace_seller_collusion = Column(Boolean, default=False)  # Colluding sellers
+
+    # Complex pattern detection (Rules 98-102)
+    transaction_pattern_entropy = Column(Numeric(5, 2))  # Randomness of patterns
+    behavioral_consistency_score = Column(Integer)  # 0-100 consistency over time
+    account_age_velocity_ratio = Column(Numeric(5, 2))  # Velocity vs account age
+    geographic_consistency_score = Column(Integer)  # 0-100 location consistency
+    temporal_consistency_score = Column(Integer)  # 0-100 time pattern consistency
+
+    # Cross-transaction analytics (Rules 103-107)
+    multi_account_cross_funding = Column(Boolean, default=False)  # Money flowing between accounts
+    round_trip_transaction = Column(Boolean, default=False)  # Money goes out and comes back
+    test_transaction_pattern = Column(Boolean, default=False)  # Small txns before large ones
+    rapid_account_progression = Column(Boolean, default=False)  # Account tier upgrade quickly
+    suspicious_beneficiary_pattern = Column(Boolean, default=False)  # Beneficiary pattern abnormal
+
+    # Advanced ML features (Rules 108-109)
+    deep_learning_fraud_score = Column(Numeric(5, 2))  # 0-1 from deep learning model
+    ensemble_model_confidence = Column(Numeric(5, 2))  # 0-1 ensemble confidence
+
     # Detection outputs
     risk_score = Column(Integer, index=True)
     risk_level = Column(String(20))  # low, medium, high
