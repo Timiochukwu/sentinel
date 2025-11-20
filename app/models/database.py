@@ -186,6 +186,34 @@ class Transaction(Base):
     deep_learning_fraud_score = Column(Numeric(5, 2))  # 0-1 from deep learning model
     ensemble_model_confidence = Column(Numeric(5, 2))  # 0-1 ensemble confidence
 
+    # PHASES 4-12: COMPREHENSIVE FEATURE TAXONOMY (249+ features organized by category)
+    # Phase 4: IDENTITY FEATURES (40 features) - Email, phone, BVN, device, network identity
+    identity_features = Column(JSONB)  # {email, phone, bvn, device, network}
+
+    # Phase 5: BEHAVIORAL FEATURES (60 features) - Session, login, transaction, interaction patterns
+    behavioral_features = Column(JSONB)  # {session, login, transaction, interaction}
+
+    # Phase 6: TRANSACTION FEATURES (40 features) - Card, banking, address, crypto, merchant
+    transaction_features = Column(JSONB)  # {card, banking, address, crypto, merchant}
+
+    # Phase 7: NETWORK/CONSORTIUM FEATURES (40 features) - Fraud linkage and graph analysis
+    network_features = Column(JSONB)  # {consortium_matching, fraud_linkage, velocity, graph_analysis}
+
+    # Phase 8: ACCOUNT TAKEOVER (ATO) SIGNALS (15 features) - Compromised account detection
+    ato_signals = Column(JSONB)  # {classic_patterns, behavioral_deviation}
+
+    # Phase 9: FUNDING SOURCE FRAUD (10 features) - Card testing and new funding abuse
+    funding_fraud_signals = Column(JSONB)  # {new_sources, card_testing}
+
+    # Phase 10: MERCHANT-LEVEL ABUSE (10 features) - Merchant risk and abuse patterns
+    merchant_abuse_signals = Column(JSONB)  # {merchant_risk, abuse_patterns}
+
+    # Phase 11: ML-DERIVED FEATURES (9 features) - Statistical outliers and ML scores
+    ml_derived_features = Column(JSONB)  # {statistical_outliers, model_scores, deep_learning}
+
+    # Phase 12: DERIVED/COMPUTED FEATURES (25 features) - Similarity, linkage, clustering, aggregate risk
+    derived_features = Column(JSONB)  # {similarity, linkage, clustering, aggregate_risk}
+
     # Detection outputs
     risk_score = Column(Integer, index=True)
     risk_level = Column(String(20))  # low, medium, high
@@ -212,6 +240,16 @@ class Transaction(Base):
         Index('idx_is_fraud', 'is_fraud'),
         Index('idx_device_fingerprint', 'device_fingerprint'),  # For loan stacking detection
         Index('idx_fingerprint_client', 'device_fingerprint', 'client_id'),  # For consortium detection
+        # JSONB indexes for feature categories (GIN indexes for fast JSONB queries)
+        Index('idx_identity_features', 'identity_features', postgresql_using='gin'),
+        Index('idx_behavioral_features', 'behavioral_features', postgresql_using='gin'),
+        Index('idx_transaction_features', 'transaction_features', postgresql_using='gin'),
+        Index('idx_network_features', 'network_features', postgresql_using='gin'),
+        Index('idx_ato_signals', 'ato_signals', postgresql_using='gin'),
+        Index('idx_funding_fraud_signals', 'funding_fraud_signals', postgresql_using='gin'),
+        Index('idx_merchant_abuse_signals', 'merchant_abuse_signals', postgresql_using='gin'),
+        Index('idx_ml_derived_features', 'ml_derived_features', postgresql_using='gin'),
+        Index('idx_derived_features', 'derived_features', postgresql_using='gin'),
     )
 
 

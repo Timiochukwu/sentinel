@@ -135,6 +135,474 @@ class Industry(str, Enum):
 
 
 # ============================================================================
+# FEATURE CATEGORY SCHEMAS (Phases 4-12: 249+ Features)
+# ============================================================================
+
+# PHASE 4: IDENTITY FEATURES (40 features)
+class IdentityEmailFeatures(BaseModel):
+    """Email identity features (5 features)"""
+    address: Optional[str] = None
+    domain: Optional[str] = None
+    age_days: Optional[int] = Field(None, ge=0)
+    reputation_score: Optional[int] = Field(None, ge=0, le=100)
+    verification_status: Optional[bool] = None
+    class Config:
+        extra = "allow"
+
+class IdentityPhoneFeatures(BaseModel):
+    """Phone identity features (5 features)"""
+    number: Optional[str] = None
+    age_days: Optional[int] = Field(None, ge=0)
+    country_code: Optional[str] = None
+    verification_status: Optional[bool] = None
+    carrier_risk: Optional[int] = Field(None, ge=0, le=100)
+    class Config:
+        extra = "allow"
+
+class IdentityBVNFeatures(BaseModel):
+    """BVN/ID identity features (3 features)"""
+    bvn: Optional[str] = None
+    nin: Optional[str] = None
+    verification_status: Optional[bool] = None
+    class Config:
+        extra = "allow"
+
+class IdentityDeviceFeatures(BaseModel):
+    """Device identity features (12 features)"""
+    fingerprint: Optional[str] = None
+    browser_type: Optional[str] = None
+    browser_version: Optional[str] = None
+    os: Optional[str] = None
+    screen_resolution: Optional[str] = None
+    timezone: Optional[str] = None
+    installed_fonts: Optional[List[str]] = None
+    canvas_fingerprint: Optional[str] = None
+    webgl_fingerprint: Optional[str] = None
+    gpu_info: Optional[str] = None
+    cpu_cores: Optional[int] = None
+    battery_level: Optional[int] = Field(None, ge=0, le=100)
+    class Config:
+        extra = "allow"
+
+class IdentityNetworkFeatures(BaseModel):
+    """Network identity features (10 features)"""
+    ip_address: Optional[str] = None
+    ip_city: Optional[str] = None
+    ip_country: Optional[str] = None
+    ip_reputation: Optional[int] = Field(None, ge=0, le=100)
+    vpn_detected: Optional[bool] = None
+    proxy_detected: Optional[bool] = None
+    tor_detected: Optional[bool] = None
+    datacenter_ip: Optional[bool] = None
+    isp: Optional[str] = None
+    asn: Optional[str] = None
+    class Config:
+        extra = "allow"
+
+class IdentityFeatures(BaseModel):
+    """Phase 4: All identity features (40 total)"""
+    email: Optional[IdentityEmailFeatures] = None
+    phone: Optional[IdentityPhoneFeatures] = None
+    bvn: Optional[IdentityBVNFeatures] = None
+    device: Optional[IdentityDeviceFeatures] = None
+    network: Optional[IdentityNetworkFeatures] = None
+    class Config:
+        extra = "allow"
+
+# PHASE 5: BEHAVIORAL FEATURES (60 features)
+class BehavioralSessionFeatures(BaseModel):
+    """Session behavior features (15 features)"""
+    mouse_movement_score: Optional[int] = Field(None, ge=0, le=100)
+    typing_speed_wpm: Optional[int] = None
+    keystroke_dynamics_score: Optional[int] = Field(None, ge=0, le=100)
+    copy_paste_count: Optional[int] = None
+    time_on_page_seconds: Optional[int] = None
+    pages_visited: Optional[int] = None
+    click_count: Optional[int] = None
+    scroll_count: Optional[int] = None
+    session_duration_seconds: Optional[int] = None
+    navigation_path: Optional[List[str]] = None
+    form_field_time_seconds: Optional[int] = None
+    hesitation_detected: Optional[bool] = None
+    error_corrections: Optional[int] = None
+    tab_switches: Optional[int] = None
+    window_resized: Optional[bool] = None
+    class Config:
+        extra = "allow"
+
+class BehavioralLoginFeatures(BaseModel):
+    """Login behavior features (13 features)"""
+    login_frequency: Optional[int] = None
+    login_time_hour: Optional[int] = Field(None, ge=0, le=23)
+    failed_login_attempts_24h: Optional[int] = None
+    failed_login_velocity: Optional[int] = None
+    password_reset_requests: Optional[int] = None
+    password_reset_txn_time_gap: Optional[int] = None
+    two_factor_enabled: Optional[bool] = None
+    biometric_auth: Optional[bool] = None
+    social_login: Optional[bool] = None
+    remember_me_used: Optional[bool] = None
+    autofill_used: Optional[bool] = None
+    new_device_login: Optional[bool] = None
+    unusual_location_login: Optional[bool] = None
+    class Config:
+        extra = "allow"
+
+class BehavioralTransactionFeatures(BaseModel):
+    """Transaction behavior features (17 features)"""
+    velocity_last_hour: Optional[int] = None
+    velocity_last_day: Optional[int] = None
+    velocity_last_week: Optional[int] = None
+    transaction_count_lifetime: Optional[int] = None
+    avg_transaction_amount: Optional[float] = None
+    max_transaction_amount: Optional[float] = None
+    min_transaction_amount: Optional[float] = None
+    txn_time_hour: Optional[int] = Field(None, ge=0, le=23)
+    txn_day_of_week: Optional[int] = Field(None, ge=0, le=6)
+    holiday_transaction: Optional[bool] = None
+    weekend_transaction: Optional[bool] = None
+    after_hours_transaction: Optional[bool] = None
+    first_transaction_amount: Optional[float] = None
+    time_since_last_txn_hours: Optional[int] = None
+    time_since_signup_days: Optional[int] = None
+    txn_to_signup_ratio: Optional[float] = None
+    new_funding_immediate_withdrawal: Optional[bool] = None
+    class Config:
+        extra = "allow"
+
+class BehavioralInteractionFeatures(BaseModel):
+    """Interaction behavior features (15 features)"""
+    referrer_source: Optional[str] = None
+    campaign_tracking: Optional[str] = None
+    utm_parameters: Optional[Dict[str, str]] = None
+    ad_click: Optional[bool] = None
+    api_calls_made: Optional[int] = None
+    api_errors: Optional[int] = None
+    swipe_gestures_count: Optional[int] = None
+    pinch_zoom_count: Optional[int] = None
+    app_switches: Optional[int] = None
+    screen_orientation_changes: Optional[int] = None
+    home_button_pressed: Optional[bool] = None
+    notification_interacted: Optional[bool] = None
+    deeplink_used: Optional[bool] = None
+    page_refresh_count: Optional[int] = None
+    browser_back_button: Optional[int] = None
+    class Config:
+        extra = "allow"
+
+class BehavioralFeatures(BaseModel):
+    """Phase 5: All behavioral features (60 total)"""
+    session: Optional[BehavioralSessionFeatures] = None
+    login: Optional[BehavioralLoginFeatures] = None
+    transaction: Optional[BehavioralTransactionFeatures] = None
+    interaction: Optional[BehavioralInteractionFeatures] = None
+    class Config:
+        extra = "allow"
+
+# PHASE 6: TRANSACTION FEATURES (40 features)
+class TransactionCardFeatures(BaseModel):
+    """Card transaction features (9 features)"""
+    bin: Optional[str] = None
+    last_four: Optional[str] = None
+    expiry_date: Optional[str] = None
+    card_country: Optional[str] = None
+    card_age_days: Optional[int] = None
+    card_reputation_score: Optional[int] = Field(None, ge=0, le=100)
+    new_card_large_withdrawal: Optional[bool] = None
+    card_testing_pattern: Optional[bool] = None
+    multiple_cards_same_device: Optional[int] = None
+    class Config:
+        extra = "allow"
+
+class TransactionBankingFeatures(BaseModel):
+    """Banking transaction features (4 features)"""
+    account_number: Optional[str] = None
+    account_age_days: Optional[int] = None
+    new_account_withdrawal: Optional[bool] = None
+    account_verification: Optional[bool] = None
+    class Config:
+        extra = "allow"
+
+class TransactionAddressFeatures(BaseModel):
+    """Address transaction features (3 features)"""
+    billing_address: Optional[str] = None
+    shipping_address: Optional[str] = None
+    address_distance_km: Optional[float] = None
+    class Config:
+        extra = "allow"
+
+class TransactionCryptoFeatures(BaseModel):
+    """Crypto transaction features (5 features)"""
+    wallet_address: Optional[str] = None
+    wallet_reputation: Optional[int] = Field(None, ge=0, le=100)
+    wallet_age_days: Optional[int] = None
+    deposit_within_24h: Optional[bool] = None
+    withdrawal_after_deposit: Optional[bool] = None
+    class Config:
+        extra = "allow"
+
+class TransactionMerchantFeatures(BaseModel):
+    """Merchant transaction features (5 features)"""
+    merchant_category: Optional[str] = None
+    merchant_high_risk: Optional[bool] = None
+    merchant_fraud_cluster: Optional[bool] = None
+    merchant_chargeback_rate: Optional[float] = None
+    merchant_refund_rate: Optional[float] = None
+    class Config:
+        extra = "allow"
+
+class TransactionFeatures(BaseModel):
+    """Phase 6: All transaction features (40 total)"""
+    card: Optional[TransactionCardFeatures] = None
+    banking: Optional[TransactionBankingFeatures] = None
+    address: Optional[TransactionAddressFeatures] = None
+    crypto: Optional[TransactionCryptoFeatures] = None
+    merchant: Optional[TransactionMerchantFeatures] = None
+    class Config:
+        extra = "allow"
+
+# PHASE 7: NETWORK/CONSORTIUM FEATURES (40 features)
+class NetworkConsortiumMatching(BaseModel):
+    """Consortium matching features (8 features)"""
+    email_seen_elsewhere: Optional[bool] = None
+    phone_seen_elsewhere: Optional[bool] = None
+    device_seen_elsewhere: Optional[bool] = None
+    ip_seen_elsewhere: Optional[bool] = None
+    card_seen_elsewhere: Optional[bool] = None
+    address_seen_elsewhere: Optional[bool] = None
+    bank_account_seen_elsewhere: Optional[bool] = None
+    bvn_seen_elsewhere: Optional[bool] = None
+    class Config:
+        extra = "allow"
+
+class NetworkFraudLinkage(BaseModel):
+    """Fraud linkage features (8 features)"""
+    email_linked_to_fraud: Optional[bool] = None
+    phone_linked_to_fraud: Optional[bool] = None
+    device_linked_to_fraud: Optional[bool] = None
+    ip_linked_to_fraud: Optional[bool] = None
+    card_linked_to_fraud: Optional[bool] = None
+    address_linked_to_fraud: Optional[bool] = None
+    bank_account_linked_to_fraud: Optional[bool] = None
+    bvn_linked_to_fraud: Optional[bool] = None
+    class Config:
+        extra = "allow"
+
+class NetworkVelocity(BaseModel):
+    """Network velocity features (7 features)"""
+    velocity_email: Optional[int] = None
+    velocity_phone: Optional[int] = None
+    velocity_device: Optional[int] = None
+    velocity_ip: Optional[int] = None
+    velocity_card: Optional[int] = None
+    velocity_bank_account: Optional[int] = None
+    velocity_bvn: Optional[int] = None
+    class Config:
+        extra = "allow"
+
+class NetworkGraphAnalysis(BaseModel):
+    """Graph analysis features (10 features)"""
+    connected_accounts_detected: Optional[bool] = None
+    fraud_ring_detected: Optional[bool] = None
+    same_ip_multiple_users: Optional[int] = None
+    same_device_multiple_users: Optional[int] = None
+    same_address_multiple_users: Optional[int] = None
+    same_bvn_multiple_accounts: Optional[int] = None
+    same_contact_multiple_users: Optional[int] = None
+    synthetic_identity_cluster: Optional[bool] = None
+    money_mule_network_detected: Optional[bool] = None
+    loan_stacking_ring_detected: Optional[bool] = None
+    class Config:
+        extra = "allow"
+
+class NetworkFeatures(BaseModel):
+    """Phase 7: All network features (40 total)"""
+    consortium_matching: Optional[NetworkConsortiumMatching] = None
+    fraud_linkage: Optional[NetworkFraudLinkage] = None
+    velocity: Optional[NetworkVelocity] = None
+    graph_analysis: Optional[NetworkGraphAnalysis] = None
+    class Config:
+        extra = "allow"
+
+# PHASE 8: ACCOUNT TAKEOVER (ATO) SIGNALS (15 features)
+class ATOClassicPatterns(BaseModel):
+    """Classic ATO patterns (10 features)"""
+    password_reset_txn: Optional[bool] = None
+    failed_login_velocity: Optional[int] = None
+    new_device_behavior_change: Optional[bool] = None
+    password_change_withdrawal: Optional[bool] = None
+    geographic_impossibility: Optional[bool] = None
+    new_device_high_value: Optional[bool] = None
+    device_change_behavior_change: Optional[bool] = None
+    suspicious_location_login: Optional[bool] = None
+    multiple_failed_logins_ips: Optional[bool] = None
+    session_hijacking_detected: Optional[bool] = None
+    class Config:
+        extra = "allow"
+
+class ATOBehavioralDeviation(BaseModel):
+    """Behavioral deviation features (5 features)"""
+    typing_pattern_deviation: Optional[bool] = None
+    mouse_movement_deviation: Optional[bool] = None
+    navigation_pattern_deviation: Optional[bool] = None
+    transaction_pattern_deviation: Optional[bool] = None
+    time_of_day_deviation: Optional[bool] = None
+    class Config:
+        extra = "allow"
+
+class ATOSignals(BaseModel):
+    """Phase 8: All ATO signals (15 total)"""
+    classic_patterns: Optional[ATOClassicPatterns] = None
+    behavioral_deviation: Optional[ATOBehavioralDeviation] = None
+    class Config:
+        extra = "allow"
+
+# PHASE 9: FUNDING SOURCE FRAUD (10 features)
+class FundingNewSources(BaseModel):
+    """New funding source features (5 features)"""
+    new_card_withdrawal: Optional[bool] = None
+    new_bank_account_withdrawal: Optional[bool] = None
+    card_added_withdrew_same_day: Optional[bool] = None
+    multiple_sources_added_quickly: Optional[bool] = None
+    funding_source_high_risk_country: Optional[bool] = None
+    class Config:
+        extra = "allow"
+
+class FundingCardTesting(BaseModel):
+    """Card testing features (5 features)"""
+    dollar_one_authorizations: Optional[int] = None
+    small_fails_large_success: Optional[bool] = None
+    multiple_cards_tested_device: Optional[bool] = None
+    bin_attack_pattern: Optional[bool] = None
+    funding_source_velocity: Optional[int] = None
+    class Config:
+        extra = "allow"
+
+class FundingFraudSignals(BaseModel):
+    """Phase 9: All funding fraud signals (10 total)"""
+    new_sources: Optional[FundingNewSources] = None
+    card_testing: Optional[FundingCardTesting] = None
+    class Config:
+        extra = "allow"
+
+# PHASE 10: MERCHANT-LEVEL ABUSE (10 features)
+class MerchantRisk(BaseModel):
+    """Merchant risk features (4 features)"""
+    high_risk_category: Optional[bool] = None
+    merchant_fraud_cluster: Optional[bool] = None
+    merchant_chargeback_rate: Optional[float] = None
+    merchant_refund_rate: Optional[float] = None
+    class Config:
+        extra = "allow"
+
+class MerchantAbusePatterns(BaseModel):
+    """Merchant abuse features (6 features)"""
+    refund_abuse_detected: Optional[bool] = None
+    cashback_abuse_detected: Optional[bool] = None
+    promo_abuse_detected: Optional[bool] = None
+    loyalty_points_abuse: Optional[bool] = None
+    referral_fraud: Optional[bool] = None
+    fake_merchant_transactions: Optional[bool] = None
+    class Config:
+        extra = "allow"
+
+class MerchantAbuseSignals(BaseModel):
+    """Phase 10: All merchant abuse signals (10 total)"""
+    merchant_risk: Optional[MerchantRisk] = None
+    abuse_patterns: Optional[MerchantAbusePatterns] = None
+    class Config:
+        extra = "allow"
+
+# PHASE 11: ML-DERIVED FEATURES (9 features)
+class MLStatisticalOutliers(BaseModel):
+    """Statistical outlier features (3 features)"""
+    outlier_score: Optional[float] = Field(None, ge=0, le=1)
+    anomaly_score: Optional[float] = Field(None, ge=0, le=1)
+    z_score: Optional[float] = None
+    class Config:
+        extra = "allow"
+
+class MLModelScores(BaseModel):
+    """ML model score features (4 features)"""
+    xgboost_risk_score: Optional[float] = Field(None, ge=0, le=1)
+    neural_network_score: Optional[float] = Field(None, ge=0, le=1)
+    random_forest_score: Optional[float] = Field(None, ge=0, le=1)
+    ensemble_model_score: Optional[float] = Field(None, ge=0, le=1)
+    class Config:
+        extra = "allow"
+
+class MLDeepLearning(BaseModel):
+    """Deep learning features (2 features)"""
+    lstm_sequence_prediction: Optional[float] = Field(None, ge=0, le=1)
+    gnn_graph_score: Optional[float] = Field(None, ge=0, le=1)
+    class Config:
+        extra = "allow"
+
+class MLDerivedFeatures(BaseModel):
+    """Phase 11: All ML-derived features (9 total)"""
+    statistical_outliers: Optional[MLStatisticalOutliers] = None
+    model_scores: Optional[MLModelScores] = None
+    deep_learning: Optional[MLDeepLearning] = None
+    class Config:
+        extra = "allow"
+
+# PHASE 12: DERIVED/COMPUTED FEATURES (25 features)
+class DerivedSimilarity(BaseModel):
+    """Similarity features (6 features)"""
+    fraudster_profile_similarity: Optional[float] = Field(None, ge=0, le=1)
+    username_similarity: Optional[float] = Field(None, ge=0, le=1)
+    email_similarity: Optional[float] = Field(None, ge=0, le=1)
+    address_similarity: Optional[float] = Field(None, ge=0, le=1)
+    behavior_similarity: Optional[float] = Field(None, ge=0, le=1)
+    transaction_pattern_similarity: Optional[float] = Field(None, ge=0, le=1)
+    class Config:
+        extra = "allow"
+
+class DerivedLinkage(BaseModel):
+    """Linkage features (4 features)"""
+    entity_resolution_score: Optional[float] = Field(None, ge=0, le=1)
+    identity_matching_score: Optional[float] = Field(None, ge=0, le=1)
+    soft_linking_score: Optional[float] = Field(None, ge=0, le=1)
+    hard_linking_score: Optional[float] = Field(None, ge=0, le=1)
+    class Config:
+        extra = "allow"
+
+class DerivedClustering(BaseModel):
+    """Clustering features (7 features)"""
+    family_connections_detected: Optional[bool] = None
+    business_connections_detected: Optional[bool] = None
+    geographic_connections_detected: Optional[bool] = None
+    temporal_connections_detected: Optional[bool] = None
+    community_detection_score: Optional[float] = Field(None, ge=0, le=1)
+    cluster_membership_score: Optional[float] = Field(None, ge=0, le=1)
+    graph_centrality_score: Optional[float] = Field(None, ge=0, le=1)
+    class Config:
+        extra = "allow"
+
+class DerivedAggregateRisk(BaseModel):
+    """Aggregate risk features (8 features)"""
+    final_risk_score: Optional[int] = Field(None, ge=0, le=100)
+    confidence_score: Optional[float] = Field(None, ge=0, le=1)
+    explainability_score: Optional[float] = Field(None, ge=0, le=1)
+    feature_importance_ranking: Optional[List[str]] = None
+    fraud_probability: Optional[float] = Field(None, ge=0, le=1)
+    false_positive_probability: Optional[float] = Field(None, ge=0, le=1)
+    model_prediction: Optional[str] = None
+    rule_violations_count: Optional[int] = None
+    class Config:
+        extra = "allow"
+
+class DerivedFeatures(BaseModel):
+    """Phase 12: All derived/computed features (25 total)"""
+    similarity: Optional[DerivedSimilarity] = None
+    linkage: Optional[DerivedLinkage] = None
+    clustering: Optional[DerivedClustering] = None
+    aggregate_risk: Optional[DerivedAggregateRisk] = None
+    class Config:
+        extra = "allow"
+
+
+# ============================================================================
 # REQUEST SCHEMAS - API Input Validation
 # ============================================================================
 
@@ -382,6 +850,34 @@ class TransactionCheckRequest(BaseModel):
     # Advanced ML features
     deep_learning_fraud_score: Optional[float] = Field(None, description="DL model score 0-1", ge=0, le=1)
     ensemble_model_confidence: Optional[float] = Field(None, description="Ensemble confidence 0-1", ge=0, le=1)
+
+    # PHASES 4-12: COMPREHENSIVE FEATURE CATEGORIES (249+ features)
+    # Phase 4: Identity Features (40 features)
+    identity_features: Optional[IdentityFeatures] = Field(None, description="Email, phone, BVN, device, network identity")
+
+    # Phase 5: Behavioral Features (60 features)
+    behavioral_features: Optional[BehavioralFeatures] = Field(None, description="Session, login, transaction, interaction patterns")
+
+    # Phase 6: Transaction Features (40 features)
+    transaction_features: Optional[TransactionFeatures] = Field(None, description="Card, banking, address, crypto, merchant data")
+
+    # Phase 7: Network/Consortium Features (40 features)
+    network_features: Optional[NetworkFeatures] = Field(None, description="Fraud linkage and graph analysis")
+
+    # Phase 8: Account Takeover Signals (15 features)
+    ato_signals: Optional[ATOSignals] = Field(None, description="Classic ATO patterns and behavioral deviations")
+
+    # Phase 9: Funding Source Fraud (10 features)
+    funding_fraud_signals: Optional[FundingFraudSignals] = Field(None, description="Card testing and new funding abuse")
+
+    # Phase 10: Merchant-Level Abuse (10 features)
+    merchant_abuse_signals: Optional[MerchantAbuseSignals] = Field(None, description="Merchant risk and abuse patterns")
+
+    # Phase 11: ML-Derived Features (9 features)
+    ml_derived_features: Optional[MLDerivedFeatures] = Field(None, description="Statistical outliers and ML model scores")
+
+    # Phase 12: Derived/Computed Features (25 features)
+    derived_features: Optional[DerivedFeatures] = Field(None, description="Similarity, linkage, clustering, and aggregate risk")
 
     class Config:
         json_schema_extra = {

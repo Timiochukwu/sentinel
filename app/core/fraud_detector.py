@@ -938,6 +938,34 @@ class FraudDetector:
             deep_learning_fraud_score=transaction.deep_learning_fraud_score,
             ensemble_model_confidence=transaction.ensemble_model_confidence,
 
+            # PHASES 4-12: COMPREHENSIVE FEATURE CATEGORIES
+            # Phase 4: Identity Features (40 features)
+            identity_features=transaction.identity_features.dict() if transaction.identity_features else None,
+
+            # Phase 5: Behavioral Features (60 features)
+            behavioral_features=transaction.behavioral_features.dict() if transaction.behavioral_features else None,
+
+            # Phase 6: Transaction Features (40 features)
+            transaction_features=transaction.transaction_features.dict() if transaction.transaction_features else None,
+
+            # Phase 7: Network/Consortium Features (40 features)
+            network_features=transaction.network_features.dict() if transaction.network_features else None,
+
+            # Phase 8: Account Takeover Signals (15 features)
+            ato_signals=transaction.ato_signals.dict() if transaction.ato_signals else None,
+
+            # Phase 9: Funding Source Fraud (10 features)
+            funding_fraud_signals=transaction.funding_fraud_signals.dict() if transaction.funding_fraud_signals else None,
+
+            # Phase 10: Merchant-Level Abuse (10 features)
+            merchant_abuse_signals=transaction.merchant_abuse_signals.dict() if transaction.merchant_abuse_signals else None,
+
+            # Phase 11: ML-Derived Features (9 features)
+            ml_derived_features=transaction.ml_derived_features.dict() if transaction.ml_derived_features else None,
+
+            # Phase 12: Derived/Computed Features (25 features)
+            derived_features=transaction.derived_features.dict() if transaction.derived_features else None,
+
             # Fraud detection results
             risk_score=risk_score,
             risk_level=risk_level,
