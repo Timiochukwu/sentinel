@@ -271,47 +271,153 @@ class MaximumFirstTransactionRule(FraudRule):
 
 
 class ImpossibleTravelRule(FraudRule):
-    """Rule 10: Impossible Travel - Lagos to Kano in 2 hours"""
+    """Rule 10: Impossible Travel Detection - Accounts for legitimate travel methods"""
 
     def __init__(self):
         super().__init__(
             name="impossible_travel",
-            description="Geographically impossible travel speed",
+            description="Geographically impossible travel considering legitimate transport methods",
             base_score=30,
             severity="high",
             verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
         )
 
+        # Realistic maximum speeds for different transport methods
+        # Including airport/station access time buffers
+        self.transport_speeds = {
+            "car": 120,                    # Car max speed (accounting for traffic, rest stops)
+            "bus": 100,                    # Interstate bus
+            "train": 150,                  # Train (e.g., Lagos-Abuja)
+            "flight": 900,                 # Commercial flight cruise speed
+            "helicopter": 300,             # Helicopter travel
+            "speedboat": 80,               # Speedboat on waterways
+        }
+
+        # Nigeria domestic routes and approximate times (including terminals)
+        self.nigerian_routes = {
+            ("lagos", "abuja"): {"distance": 500, "flight_time": 1.5, "drive_time": 7, "common": True},
+            ("abuja", "lagos"): {"distance": 500, "flight_time": 1.5, "drive_time": 7, "common": True},
+            ("lagos", "kano"): {"distance": 850, "flight_time": 2, "drive_time": 13, "common": True},
+            ("kano", "lagos"): {"distance": 850, "flight_time": 2, "drive_time": 13, "common": True},
+            ("lagos", "port_harcourt"): {"distance": 500, "flight_time": 1, "drive_time": 7, "common": True},
+            ("port_harcourt", "lagos"): {"distance": 500, "flight_time": 1, "drive_time": 7, "common": True},
+        }
+
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
         last_location = context.get("last_location", {})
 
-        if transaction.latitude and transaction.longitude and last_location:
-            # Simple distance check (would use proper geolocation in production)
-            distance_km = self._calculate_distance(
-                transaction.latitude, transaction.longitude,
-                last_location.get("latitude"), last_location.get("longitude")
+        if not (transaction.latitude and transaction.longitude and last_location):
+            return None
+
+        # Calculate actual distance traveled
+        distance_km = self._calculate_distance(
+            transaction.latitude, transaction.longitude,
+            last_location.get("latitude"), last_location.get("longitude")
+        )
+
+        time_diff_hours = last_location.get("time_diff_hours", 0)
+
+        if time_diff_hours <= 0 or distance_km < 100:
+            return None
+
+        calculated_speed_kmh = distance_km / time_diff_hours
+
+        # SCENARIO 1: Very short distance - always OK
+        if distance_km < 100:
+            return None
+
+        # SCENARIO 2: Reasonable driving/bus distance
+        # Lagos to Abuja (500km) in 7-8 hours is normal (car/bus)
+        if calculated_speed_kmh <= 120:  # Normal car/bus speed
+            return None
+
+        # SCENARIO 3: Flight is possible - check if travel time is realistic for flight
+        # Include buffer for: check-in, security, boarding, taxi, landing, baggage claim, transfer
+        # Typical domestic flight (Lagos-Kano): 2 hours flight + 2 hours terminals = 4 hours minimum
+        if self._is_flight_viable(distance_km, time_diff_hours):
+            # Flight is possible, but only flag if speed is unrealistic even for flights
+            max_flight_speed = self.transport_speeds["flight"]
+            if calculated_speed_kmh > max_flight_speed:
+                # Speed exceeded even maximum flight capability (impossible)
+                return FraudFlag(
+                    type=self.name,
+                    severity="critical",
+                    message=f"Impossible: {distance_km:.0f}km in {time_diff_hours:.1f}h ({calculated_speed_kmh:.0f}km/h) - exceeds flight speed",
+                    score=45,  # Higher score for truly impossible
+                    confidence=0.95
+                )
+            else:
+                # Flight is viable - no flag
+                return None
+
+        # SCENARIO 4: Speed is impossible (faster than any transport method)
+        max_possible_speed = self.transport_speeds["flight"]
+        if calculated_speed_kmh > max_possible_speed:
+            return FraudFlag(
+                type=self.name,
+                severity="critical",
+                message=f"Impossible: {distance_km:.0f}km in {time_diff_hours:.1f}h ({calculated_speed_kmh:.0f}km/h)",
+                score=45,
+                confidence=0.95
             )
 
-            time_diff_hours = last_location.get("time_diff_hours", 0)
+        # SCENARIO 5: Speed is suspicious but possible (e.g., 200-500 km/h range)
+        # This could be fraud trying to use impossible travel or could be account across time zones
+        if calculated_speed_kmh > max_possible_speed * 0.5:  # Over 450 km/h
+            return FraudFlag(
+                type=self.name,
+                severity="high",
+                message=f"Highly suspicious travel: {distance_km:.0f}km in {time_diff_hours:.1f}h ({calculated_speed_kmh:.0f}km/h) - requires flight verification",
+                score=self.base_score,
+                confidence=0.75
+            )
 
-            if time_diff_hours > 0 and distance_km > 100:
-                speed_kmh = distance_km / time_diff_hours
-                if speed_kmh > 120:  # Unrealistic travel speed
-                    return FraudFlag(
-                        type=self.name,
-                        severity=self.severity,
-                        message=f"Traveled {distance_km:.0f}km in {time_diff_hours:.1f}h ({speed_kmh:.0f}km/h)",
-                        score=self.base_score,
-                        confidence=0.91
-                    )
         return None
 
+    def _is_flight_viable(self, distance_km: float, time_hours: float) -> bool:
+        """
+        Check if travel time is viable for a flight + airport/terminal buffer
+
+        Factors considered:
+        - Flight takes distance/900 hours (cruise speed ~900 km/h)
+        - Pre-flight: check-in, security, boarding = 1.5-2 hours
+        - Post-flight: landing, taxi, baggage, exit = 0.5-1 hour
+        - Total minimum = 3-3.5 hours even for shortest domestic flight
+
+        For longer flights (500km+), add buffer:
+        - 500km flight + terminals = 4 hours
+        - 850km flight + terminals = 4.5 hours
+        - 1500km flight + terminals = 5.5 hours
+        """
+        flight_time = distance_km / 900  # Hours in air
+
+        # Minimum terminal time: 2 hours (check-in, security, boarding)
+        # This is realistic for domestic Nigerian flights
+        minimum_terminal_time = 2.0
+
+        # Maximum reasonable total time (flight + terminals)
+        # Add 1 hour buffer for unexpected delays
+        max_realistic_time = flight_time + minimum_terminal_time + 1.0
+
+        # If actual time fits within realistic flight window, it's viable
+        return time_hours >= flight_time and time_hours <= max_realistic_time + 2.0
+
     def _calculate_distance(self, lat1, lon1, lat2, lon2):
-        """Simple distance calculation (placeholder - use proper geopy in production)"""
-        # Simplified: 1 degree ≈ 111km
+        """
+        Calculate distance using simplified formula (Haversine approximation)
+
+        In production, use proper geolocation library like geopy
+        This is simplified: 1 degree latitude ≈ 111 km, 1 degree longitude varies by latitude
+        """
         if lat2 is None or lon2 is None:
             return 0
-        return abs(lat1 - lat2) * 111 + abs(lon1 - lon2) * 111
+
+        # Simple approximation: treat as rectangular grid
+        lat_diff = abs(float(lat1) - float(lat2)) * 111  # km per degree latitude
+        lon_diff = abs(float(lon1) - float(lon2)) * 111 * 0.73  # km per degree longitude (at Nigeria's latitude)
+
+        # Pythagorean distance
+        return (lat_diff ** 2 + lon_diff ** 2) ** 0.5
 
 
 class VPNProxyRule(FraudRule):
