@@ -928,6 +928,2002 @@ class HighRiskCategoryRule(FraudRule):
         return None
 
 
+# ============================================================================
+# PHASE 4: EXTENDED IDENTITY RULES (30+ additional rules)
+# ============================================================================
+
+class EmailDomainLegitimacyRule(FraudRule):
+    """Email domain legitimacy check"""
+    def __init__(self):
+        super().__init__(
+            name="email_domain_legitimacy",
+            description="Email from suspicious domain",
+            base_score=20,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.identity_features and transaction.identity_features.email:
+            if transaction.identity_features.email.domain:
+                domain = transaction.identity_features.email.domain.lower()
+                suspicious_domains = ['tempmail.com', 'guerrillamail.com', 'mailinator.com', '10minutemail.com']
+                if any(d in domain for d in suspicious_domains):
+                    return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.82, message=f"Suspicious email domain: {domain}")
+        return None
+
+class EmailVerificationMismatchRule(FraudRule):
+    """Unverified email with high-value transaction"""
+    def __init__(self):
+        super().__init__(
+            name="email_verification_mismatch",
+            description="Unverified email with suspicious activity",
+            base_score=25,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.identity_features and transaction.identity_features.email:
+            if not transaction.identity_features.email.verification_status and transaction.amount > 500000:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.75, message="Unverified email with large transaction")
+        return None
+
+class PhoneVerificationFailureRule(FraudRule):
+    """Phone fails verification attempts"""
+    def __init__(self):
+        super().__init__(
+            name="phone_verification_failure",
+            description="Phone fails multiple verification attempts",
+            base_score=28,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        verification_attempts = context.get("phone_verification_attempts", 0)
+        if verification_attempts > 3:
+            return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.80, message=f"Phone failed {verification_attempts} verification attempts")
+        return None
+
+class PhoneCountryMismatchRule(FraudRule):
+    """Phone country differs from IP country"""
+    def __init__(self):
+        super().__init__(
+            name="phone_country_mismatch",
+            description="Phone country differs from location",
+            base_score=22,
+            severity="medium",
+            verticals=["lending", "fintech", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.identity_features and transaction.identity_features.phone and transaction.identity_features.network:
+            phone_country = transaction.identity_features.phone.country_code
+            ip_country = transaction.identity_features.network.ip_country
+            if phone_country and ip_country and phone_country != ip_country:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.70, message=f"Phone ({phone_country}) != IP ({ip_country})")
+        return None
+
+class BVNAgeInconsistencyRule(FraudRule):
+    """BVN age inconsistent with other indicators"""
+    def __init__(self):
+        super().__init__(
+            name="bvn_age_inconsistency",
+            description="BVN age mismatches account age",
+            base_score=26,
+            severity="high",
+            verticals=["lending", "fintech", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        bvn_age = context.get("bvn_age_days", 0)
+        account_age = transaction.account_age_days or 0
+        if bvn_age > 0 and account_age > 0:
+            age_diff = abs(bvn_age - account_age)
+            if age_diff > 365:  # More than 1 year difference
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.72, message=f"BVN age ({bvn_age}d) vs account ({account_age}d)")
+        return None
+
+class DeviceFingerprintChangeRule(FraudRule):
+    """Device fingerprint changed recently"""
+    def __init__(self):
+        super().__init__(
+            name="device_fingerprint_change",
+            description="Device fingerprint changed from historical",
+            base_score=24,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        current_fingerprint = transaction.device_fingerprint
+        previous_fingerprint = context.get("previous_device_fingerprint")
+        if current_fingerprint and previous_fingerprint and current_fingerprint != previous_fingerprint:
+            return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.68, message="Device fingerprint changed from historical")
+        return None
+
+class BrowserVersionAnomalyRule(FraudRule):
+    """Browser version is outdated or anomalous"""
+    def __init__(self):
+        super().__init__(
+            name="browser_version_anomaly",
+            description="Browser version is outdated or anomalous",
+            base_score=18,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.identity_features and transaction.identity_features.device:
+            browser_version = transaction.identity_features.device.browser_version
+            # Check if browser version is outdated (simplified check)
+            if browser_version and int(browser_version.split('.')[0] if browser_version else 0) < 50:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.60, message=f"Outdated browser version: {browser_version}")
+        return None
+
+class GPUFingerprintAnomalyRule(FraudRule):
+    """GPU fingerprint indicates emulator/VM"""
+    def __init__(self):
+        super().__init__(
+            name="gpu_fingerprint_anomaly",
+            description="GPU fingerprint suggests emulation",
+            base_score=32,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.identity_features and transaction.identity_features.device:
+            gpu = transaction.identity_features.device.gpu_info
+            if gpu:
+                suspicious_gpus = ['swiftshader', 'llvmpipe', 'virtualbox', 'qemu', 'vmware', 'hyper-v']
+                if any(s in gpu.lower() for s in suspicious_gpus):
+                    return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.85, message=f"Suspicious GPU: {gpu}")
+        return None
+
+class IPLocationConsistencyRule(FraudRule):
+    """IP geolocation inconsistent with user profile"""
+    def __init__(self):
+        super().__init__(
+            name="ip_location_consistency",
+            description="IP location inconsistent with profile",
+            base_score=20,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        user_city = context.get("user_city")
+        ip_city = transaction.identity_features.network.ip_city if transaction.identity_features and transaction.identity_features.network else None
+        if user_city and ip_city and user_city.lower() != ip_city.lower():
+            previous_txn = context.get("previous_txn_timestamp")
+            if previous_txn:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.65, message=f"IP location ({ip_city}) != user city ({user_city})")
+        return None
+
+class ISPReputationRule(FraudRule):
+    """ISP has poor reputation"""
+    def __init__(self):
+        super().__init__(
+            name="isp_reputation",
+            description="ISP known for fraud/spam",
+            base_score=15,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        isp_fraud_score = context.get("isp_fraud_score", 0)
+        if isp_fraud_score > 0.7:  # High fraud ISP
+            return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.72, message=f"ISP fraud score: {isp_fraud_score:.2f}")
+        return None
+
+class ASNBlacklistRule(FraudRule):
+    """ASN is on fraud blacklist"""
+    def __init__(self):
+        super().__init__(
+            name="asn_blacklist",
+            description="ASN on fraud blacklist",
+            base_score=35,
+            severity="critical",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        asn_blacklisted = context.get("asn_blacklisted", False)
+        if asn_blacklisted:
+            return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.95, message="ASN on fraud blacklist")
+        return None
+
+class MultipleEmailsDeviceRule(FraudRule):
+    """Device has multiple email addresses"""
+    def __init__(self):
+        super().__init__(
+            name="multiple_emails_device",
+            description="Multiple emails linked to device",
+            base_score=23,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        email_count = context.get("device_email_count", 1)
+        if email_count > 5:
+            return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.70, message=f"Device linked to {email_count} emails")
+        return None
+
+class DeviceOSChangedRule(FraudRule):
+    """Device OS changed between transactions"""
+    def __init__(self):
+        super().__init__(
+            name="device_os_changed",
+            description="Device OS changed between transactions",
+            base_score=26,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        previous_os = context.get("previous_device_os")
+        if transaction.identity_features and transaction.identity_features.device and previous_os:
+            current_os = transaction.identity_features.device.os
+            if current_os and current_os.lower() != previous_os.lower():
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.75, message=f"OS changed: {previous_os} → {current_os}")
+        return None
+
+class CanvasFingerprinterRule(FraudRule):
+    """Canvas fingerprint used for tracking/fraud"""
+    def __init__(self):
+        super().__init__(
+            name="canvas_fingerprinter",
+            description="Canvas fingerprint detected",
+            base_score=19,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.identity_features and transaction.identity_features.device:
+            if transaction.identity_features.device.canvas_fingerprint:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.58, message="Canvas fingerprinting detected")
+        return None
+
+class WebGLFingerprintRule(FraudRule):
+    """WebGL fingerprint indicates targeted tracking"""
+    def __init__(self):
+        super().__init__(
+            name="webgl_fingerprint",
+            description="WebGL fingerprint tracking detected",
+            base_score=17,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.identity_features and transaction.identity_features.device:
+            if transaction.identity_features.device.webgl_fingerprint:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.55, message="WebGL fingerprinting detected")
+        return None
+
+class FontListAnomalyRule(FraudRule):
+    """Installed fonts list is unusual"""
+    def __init__(self):
+        super().__init__(
+            name="font_list_anomaly",
+            description="Installed fonts list is anomalous",
+            base_score=16,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.identity_features and transaction.identity_features.device:
+            fonts = transaction.identity_features.device.installed_fonts
+            if fonts and len(fonts) < 5:  # Very few fonts suggests VM/emulator
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.62, message=f"Unusual font list ({len(fonts)} fonts)")
+        return None
+
+class CPUCoreAnomalyRule(FraudRule):
+    """CPU core count is unusual"""
+    def __init__(self):
+        super().__init__(
+            name="cpu_core_anomaly",
+            description="CPU core count is unusual",
+            base_score=14,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.identity_features and transaction.identity_features.device:
+            cores = transaction.identity_features.device.cpu_cores
+            if cores and cores == 1:  # Single core very suspicious
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.65, message=f"Unusual CPU: {cores} core(s)")
+        return None
+
+class BatteryDrainAnomalyRule(FraudRule):
+    """Battery level indicates intensive activity"""
+    def __init__(self):
+        super().__init__(
+            name="battery_drain_anomaly",
+            description="Battery level suggests emulator/bot",
+            base_score=12,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.identity_features and transaction.identity_features.device:
+            battery = transaction.identity_features.device.battery_level
+            if battery is not None and (battery == 100 or battery == 0):  # Always full or always zero = suspicious
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.60, message=f"Suspicious battery level: {battery}%")
+        return None
+
+class TimezoneOffsetAnomalyRule(FraudRule):
+    """Timezone offset inconsistent with location"""
+    def __init__(self):
+        super().__init__(
+            name="timezone_offset_anomaly",
+            description="Timezone offset inconsistent with IP location",
+            base_score=18,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        expected_offset = context.get("expected_timezone_offset", 0)
+        if transaction.identity_features and transaction.identity_features.device:
+            device_offset = context.get("device_timezone_offset", 0)
+            if abs(expected_offset - device_offset) > 2:  # More than 2 hour difference
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.62, message=f"TZ offset mismatch: {device_offset} vs {expected_offset}")
+        return None
+
+class ScreenResolutionHistoryRule(FraudRule):
+    """Screen resolution changed unexpectedly"""
+    def __init__(self):
+        super().__init__(
+            name="screen_resolution_history",
+            description="Screen resolution changed between txns",
+            base_score=15,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        prev_resolution = context.get("previous_screen_resolution")
+        if transaction.identity_features and transaction.identity_features.device and prev_resolution:
+            current_resolution = transaction.identity_features.device.screen_resolution
+            if current_resolution and current_resolution != prev_resolution:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.55, message=f"Resolution changed: {prev_resolution} → {current_resolution}")
+        return None
+
+# ============================================================================
+# PHASE 5: EXTENDED BEHAVIORAL RULES (40+ additional rules)
+# ============================================================================
+
+class MouseMovementSuspiciousRule(FraudRule):
+    """Mouse movement pattern is too perfect/robotic"""
+    def __init__(self):
+        super().__init__(
+            name="mouse_movement_suspicious",
+            description="Mouse movement pattern is robotic",
+            base_score=28,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.session:
+            score = transaction.behavioral_features.session.mouse_movement_score
+            if score is not None and score > 95:  # Too perfect = likely bot
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.80, message=f"Mouse pattern too perfect: {score}")
+        return None
+
+class TypingSpeedConstantRule(FraudRule):
+    """Typing speed is unnaturally constant"""
+    def __init__(self):
+        super().__init__(
+            name="typing_speed_constant",
+            description="Typing speed unnaturally consistent",
+            base_score=26,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        typing_variance = context.get("typing_speed_variance", 0)
+        if typing_variance < 0.1:  # Very low variance = bot
+            return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.82, message=f"Typing speed variance too low: {typing_variance}")
+        return None
+
+class KeystrokeDynamicsFailureRule(FraudRule):
+    """Keystroke dynamics fails to match user profile"""
+    def __init__(self):
+        super().__init__(
+            name="keystroke_dynamics_failure",
+            description="Keystroke pattern differs from user profile",
+            base_score=32,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.session:
+            current_score = transaction.behavioral_features.session.keystroke_dynamics_score
+            user_baseline = context.get("user_keystroke_baseline", 75)
+            if current_score and abs(current_score - user_baseline) > 20:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.78, message=f"Keystroke pattern deviation: {current_score} vs {user_baseline}")
+        return None
+
+class CopyPasteAbuseRule(FraudRule):
+    """Excessive copy/paste indicating automated fill"""
+    def __init__(self):
+        super().__init__(
+            name="copy_paste_abuse",
+            description="Excessive copy/paste activity",
+            base_score=24,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.session:
+            paste_count = transaction.behavioral_features.session.copy_paste_count
+            if paste_count and paste_count > 10:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.75, message=f"Excessive copy/paste: {paste_count} times")
+        return None
+
+class SessionDurationAnomalyRule(FraudRule):
+    """Session duration is unusually short or long"""
+    def __init__(self):
+        super().__init__(
+            name="session_duration_anomaly",
+            description="Session duration is anomalous",
+            base_score=20,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.session:
+            duration = transaction.behavioral_features.session.session_duration_seconds
+            if duration and (duration < 5 or duration > 3600):  # Too fast or too slow
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.65, message=f"Anomalous session: {duration}s")
+        return None
+
+class LoginFailureAccelerationRule(FraudRule):
+    """Failed login attempts accelerating"""
+    def __init__(self):
+        super().__init__(
+            name="login_failure_acceleration",
+            description="Failed login attempts accelerating",
+            base_score=30,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.login:
+            attempts = transaction.behavioral_features.login.failed_login_attempts_24h
+            velocity = transaction.behavioral_features.login.failed_login_velocity
+            if attempts and velocity and velocity > 5:  # High velocity
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.83, message=f"Failed login velocity: {velocity} attempts/min")
+        return None
+
+class PasswordResetWithdrawalRule(FraudRule):
+    """Password reset immediately followed by withdrawal"""
+    def __init__(self):
+        super().__init__(
+            name="password_reset_withdrawal",
+            description="Password reset → transaction within hours",
+            base_score=38,
+            severity="critical",
+            verticals=["lending", "fintech", "payments", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.login:
+            gap = transaction.behavioral_features.login.password_reset_txn_time_gap
+            if gap and gap < 2:  # Within 2 hours
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.91, message=f"Password reset {gap}h before txn")
+        return None
+
+class TwoFactorBypassRule(FraudRule):
+    """2FA disabled before high-value transaction"""
+    def __init__(self):
+        super().__init__(
+            name="two_factor_bypass",
+            description="2FA disabled before transaction",
+            base_score=42,
+            severity="critical",
+            verticals=["lending", "fintech", "payments", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.login:
+            was_2fa_enabled = context.get("previous_2fa_enabled", True)
+            is_2fa_enabled = transaction.behavioral_features.login.two_factor_enabled
+            if was_2fa_enabled and not is_2fa_enabled:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.89, message="2FA disabled before transaction")
+        return None
+
+class BiometricAuthFailureRule(FraudRule):
+    """Biometric authentication fails, password used instead"""
+    def __init__(self):
+        super().__init__(
+            name="biometric_auth_failure",
+            description="Biometric auth failed, fallback to password",
+            base_score=25,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        biometric_available = context.get("biometric_available", False)
+        if transaction.behavioral_features and transaction.behavioral_features.login:
+            biometric_used = transaction.behavioral_features.login.biometric_auth
+            if biometric_available and not biometric_used:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.70, message="Biometric auth skipped, password used")
+        return None
+
+class TransactionVelocityAccelerationRule(FraudRule):
+    """Transaction velocity is accelerating"""
+    def __init__(self):
+        super().__init__(
+            name="transaction_velocity_acceleration",
+            description="Transaction velocity increasing over time",
+            base_score=28,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.transaction:
+            hourly = transaction.behavioral_features.transaction.velocity_last_hour or 0
+            daily = transaction.behavioral_features.transaction.velocity_last_day or 0
+            weekly = transaction.behavioral_features.transaction.velocity_last_week or 0
+            if hourly > 5 and daily > 10 and weekly > 20:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.80, message=f"Velocity: {hourly}h, {daily}d, {weekly}w")
+        return None
+
+class FirstTransactionAmountDeviation(FraudRule):
+    """First transaction vastly different from subsequent"""
+    def __init__(self):
+        super().__init__(
+            name="first_transaction_deviation",
+            description="First txn amount deviates from avg",
+            base_score=20,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.transaction:
+            first = transaction.behavioral_features.transaction.first_transaction_amount
+            avg = transaction.behavioral_features.transaction.avg_transaction_amount
+            if first and avg and avg > 0:
+                deviation = abs(first - avg) / avg
+                if deviation > 2:  # More than 2x deviation
+                    return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.68, message=f"First txn {deviation:.1f}x avg")
+        return None
+
+class UnusualTimingPatternRule(FraudRule):
+    """Transaction timing is unusually consistent"""
+    def __init__(self):
+        super().__init__(
+            name="unusual_timing_pattern",
+            description="Transactions occur at consistent intervals",
+            base_score=22,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        timing_variance = context.get("transaction_timing_variance", 0)
+        if timing_variance < 0.05:  # Very consistent timing = bot
+            return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.72, message=f"Transaction timing too regular")
+        return None
+
+class FormFillingSpeedRule(FraudRule):
+    """Form filled too quickly"""
+    def __init__(self):
+        super().__init__(
+            name="form_filling_speed",
+            description="Form filled faster than human possible",
+            base_score=24,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.session:
+            field_time = transaction.behavioral_features.session.form_field_time_seconds
+            if field_time and field_time < 2:  # Less than 2 seconds for entire form
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.75, message=f"Form filled in {field_time}s")
+        return None
+
+class HesitationDetectionRule(FraudRule):
+    """No hesitation in form completion (bot indicator)"""
+    def __init__(self):
+        super().__init__(
+            name="hesitation_absence",
+            description="No hesitation detected (bot behavior)",
+            base_score=21,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.session:
+            hesitation = transaction.behavioral_features.session.hesitation_detected
+            if hesitation is False:  # No hesitation at all
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.65, message="No hesitation detected in session")
+        return None
+
+class ErrorCorrectionPatternRule(FraudRule):
+    """Error correction pattern indicates typing"""
+    def __init__(self):
+        super().__init__(
+            name="error_correction_pattern",
+            description="Error correction pattern suggests human",
+            base_score=10,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.session:
+            corrections = transaction.behavioral_features.session.error_corrections
+            if corrections is not None and corrections == 0:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.50, message="No error corrections (likely bot)")
+        return None
+
+class TabSwitchingRule(FraudRule):
+    """Excessive tab switching indicates fraud research"""
+    def __init__(self):
+        super().__init__(
+            name="tab_switching",
+            description="Excessive tab switching",
+            base_score=19,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.session:
+            switches = transaction.behavioral_features.session.tab_switches
+            if switches and switches > 15:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.60, message=f"Excessive tab switches: {switches}")
+        return None
+
+class WindowResizeActivityRule(FraudRule):
+    """Window resizing indicates testing/automation"""
+    def __init__(self):
+        super().__init__(
+            name="window_resize_activity",
+            description="Window resized during session",
+            base_score=16,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.session:
+            resized = transaction.behavioral_features.session.window_resized
+            if resized:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.55, message="Window resized during session")
+        return None
+
+class APIErrorVelocityRule(FraudRule):
+    """High API error rate suggests probing/testing"""
+    def __init__(self):
+        super().__init__(
+            name="api_error_velocity",
+            description="High rate of API errors",
+            base_score=25,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "crypto"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.interaction:
+            api_errors = transaction.behavioral_features.interaction.api_errors
+            api_calls = transaction.behavioral_features.interaction.api_calls_made
+            if api_calls and api_calls > 0 and api_errors and api_errors / api_calls > 0.3:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.72, message=f"API error rate: {100*api_errors/api_calls:.0f}%")
+        return None
+
+class MobileGestureAnomalyRule(FraudRule):
+    """Mobile gestures are unnatural"""
+    def __init__(self):
+        super().__init__(
+            name="mobile_gesture_anomaly",
+            description="Mobile gestures are unnatural",
+            base_score=20,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.interaction:
+            swipes = transaction.behavioral_features.interaction.swipe_gestures_count
+            pinches = transaction.behavioral_features.interaction.pinch_zoom_count
+            if swipes and pinches and (swipes == 0 and pinches == 0):
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.62, message="No natural mobile gestures")
+        return None
+
+class AppSwitchingRule(FraudRule):
+    """Excessive app switching (fraud research pattern)"""
+    def __init__(self):
+        super().__init__(
+            name="app_switching",
+            description="Excessive app switching activity",
+            base_score=17,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.interaction:
+            switches = transaction.behavioral_features.interaction.app_switches
+            if switches and switches > 10:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.58, message=f"App switches: {switches}")
+        return None
+
+class ScreenOrientationAnomalyRule(FraudRule):
+    """Screen orientation changes indicate device type change"""
+    def __init__(self):
+        super().__init__(
+            name="screen_orientation_anomaly",
+            description="Unusual screen orientation changes",
+            base_score=14,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.interaction:
+            rotations = transaction.behavioral_features.interaction.screen_orientation_changes
+            if rotations and rotations > 5:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.60, message=f"Screen rotations: {rotations}")
+        return None
+
+class NotificationInteractionRule(FraudRule):
+    """Interaction with push notifications"""
+    def __init__(self):
+        super().__init__(
+            name="notification_interaction",
+            description="User interacted with push notification",
+            base_score=5,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.interaction:
+            interacted = transaction.behavioral_features.interaction.notification_interacted
+            if interacted:  # Positive indicator (less likely fraud)
+                return None
+        return None
+
+class PageRefreshAnomalyRule(FraudRule):
+    """Excessive page refreshes"""
+    def __init__(self):
+        super().__init__(
+            name="page_refresh_anomaly",
+            description="Excessive page refreshes",
+            base_score=15,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.interaction:
+            refreshes = transaction.behavioral_features.interaction.page_refresh_count
+            if refreshes and refreshes > 5:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.60, message=f"Page refreshes: {refreshes}")
+        return None
+
+class DeepLinkBypassRule(FraudRule):
+    """Deep link used to skip authentication"""
+    def __init__(self):
+        super().__init__(
+            name="deeplink_bypass",
+            description="Deep link used to bypass normal flow",
+            base_score=27,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.interaction:
+            if transaction.behavioral_features.interaction.deeplink_used:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.75, message="Deep link used in session")
+        return None
+
+class CampaignTrackingAnomalyRule(FraudRule):
+    """Suspicious campaign tracking parameters"""
+    def __init__(self):
+        super().__init__(
+            name="campaign_tracking_anomaly",
+            description="Suspicious campaign parameters",
+            base_score=18,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.interaction:
+            campaign = transaction.behavioral_features.interaction.campaign_tracking
+            suspicious_campaigns = ['test', 'fraud', 'abuse', 'bot', 'attack']
+            if campaign and any(s in campaign.lower() for s in suspicious_campaigns):
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.65, message=f"Suspicious campaign: {campaign}")
+        return None
+
+class ReferrerSourceAnomalyRule(FraudRule):
+    """Suspicious referrer source"""
+    def __init__(self):
+        super().__init__(
+            name="referrer_anomaly",
+            description="Suspicious referrer source",
+            base_score=16,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.behavioral_features and transaction.behavioral_features.interaction:
+            referrer = transaction.behavioral_features.interaction.referrer_source
+            suspicious_referrers = ['none', '(direct)', 'proxy', 'vpn', 'anonymous']
+            if referrer and any(s in referrer.lower() for s in suspicious_referrers):
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.60, message=f"Suspicious referrer: {referrer}")
+        return None
+
+# ============================================================================
+# PHASE 6: EXTENDED TRANSACTION RULES (35+ additional rules)
+# ============================================================================
+
+class CardAgeNewRule(FraudRule):
+    """Card is very new"""
+    def __init__(self):
+        super().__init__(
+            name="card_age_new",
+            description="Card issued within last 7 days",
+            base_score=22,
+            severity="medium",
+            verticals=["ecommerce", "payments", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.transaction_features and transaction.transaction_features.card:
+            age = transaction.transaction_features.card.card_age_days
+            if age and age < 7:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.70, message=f"Card only {age} days old")
+        return None
+
+class CardTestingPatternRule(FraudRule):
+    """Card testing pattern detected"""
+    def __init__(self):
+        super().__init__(
+            name="card_testing_pattern",
+            description="Multiple small transactions followed by large",
+            base_score=30,
+            severity="high",
+            verticals=["ecommerce", "payments", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.transaction_features and transaction.transaction_features.card:
+            if transaction.transaction_features.card.card_testing_pattern:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.85, message="Card testing pattern detected")
+        return None
+
+class CardReputationLowRule(FraudRule):
+    """Card has poor reputation"""
+    def __init__(self):
+        super().__init__(
+            name="card_reputation_low",
+            description="Card reputation score is low",
+            base_score=25,
+            severity="medium",
+            verticals=["ecommerce", "payments", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.transaction_features and transaction.transaction_features.card:
+            rep = transaction.transaction_features.card.card_reputation_score
+            if rep and rep < 30:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.75, message=f"Card reputation: {rep}/100")
+        return None
+
+class NewBankAccountWithdrawalRule(FraudRule):
+    """New bank account with immediate withdrawal"""
+    def __init__(self):
+        super().__init__(
+            name="new_bank_account_withdrawal",
+            description="New bank account with withdrawal",
+            base_score=28,
+            severity="high",
+            verticals=["lending", "fintech", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.transaction_features and transaction.transaction_features.banking:
+            age = transaction.transaction_features.banking.account_age_days
+            if age and age < 7 and transaction.transaction_features.banking.new_account_withdrawal:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.82, message=f"New bank account ({age}d) with withdrawal")
+        return None
+
+class BankAccountVerificationFailRule(FraudRule):
+    """Bank account fails verification"""
+    def __init__(self):
+        super().__init__(
+            name="bank_account_verification_fail",
+            description="Bank account not verified",
+            base_score=24,
+            severity="medium",
+            verticals=["lending", "fintech", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.transaction_features and transaction.transaction_features.banking:
+            verified = transaction.transaction_features.banking.account_verification
+            if verified is False and transaction.amount > 500000:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.70, message="Unverified bank account with large transaction")
+        return None
+
+class AddressDistanceAnomalyRule(FraudRule):
+    """Billing and shipping addresses too far apart"""
+    def __init__(self):
+        super().__init__(
+            name="address_distance_anomaly",
+            description="Billing/shipping address distance suspicious",
+            base_score=20,
+            severity="medium",
+            verticals=["ecommerce", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.transaction_features and transaction.transaction_features.address:
+            distance = transaction.transaction_features.address.address_distance_km
+            if distance and distance > 1000:  # More than 1000km apart
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.68, message=f"Addresses {distance}km apart")
+        return None
+
+class CryptoNewWalletHighValueRule(FraudRule):
+    """New wallet with high-value transaction"""
+    def __init__(self):
+        super().__init__(
+            name="crypto_new_wallet_high_value",
+            description="New crypto wallet with large transaction",
+            base_score=32,
+            severity="high",
+            verticals=["crypto"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.transaction_features and transaction.transaction_features.crypto:
+            age = transaction.transaction_features.crypto.wallet_age_days
+            if age and age < 7 and transaction.amount > 5000000:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.80, message=f"New wallet ({age}d) with large transaction")
+        return None
+
+class CryptoWithdrawalAfterDepositRule(FraudRule):
+    """Immediate withdrawal after deposit (coin tumbling)"""
+    def __init__(self):
+        super().__init__(
+            name="crypto_withdrawal_after_deposit",
+            description="Withdrawal immediately after deposit",
+            base_score=35,
+            severity="critical",
+            verticals=["crypto"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.transaction_features and transaction.transaction_features.crypto:
+            if transaction.transaction_features.crypto.withdrawal_after_deposit:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.88, message="Withdrawal after deposit (coin tumbling)")
+        return None
+
+class MerchantHighRiskCategoryRule(FraudRule):
+    """Merchant in high-risk category"""
+    def __init__(self):
+        super().__init__(
+            name="merchant_high_risk_category",
+            description="Merchant category is high-risk",
+            base_score=20,
+            severity="medium",
+            verticals=["ecommerce", "marketplace", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.transaction_features and transaction.transaction_features.merchant:
+            if transaction.transaction_features.merchant.merchant_high_risk:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.72, message="High-risk merchant category")
+        return None
+
+class MerchantChargebackRateRule(FraudRule):
+    """Merchant has high chargeback rate"""
+    def __init__(self):
+        super().__init__(
+            name="merchant_chargeback_rate",
+            description="Merchant high chargeback rate",
+            base_score=18,
+            severity="low",
+            verticals=["ecommerce", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.transaction_features and transaction.transaction_features.merchant:
+            rate = transaction.transaction_features.merchant.merchant_chargeback_rate
+            if rate and rate > 0.05:  # >5% chargeback rate
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.65, message=f"Merchant chargeback rate: {rate:.1%}")
+        return None
+
+class MerchantRefundRateRule(FraudRule):
+    """Merchant has high refund rate"""
+    def __init__(self):
+        super().__init__(
+            name="merchant_refund_rate",
+            description="Merchant high refund rate",
+            base_score=17,
+            severity="low",
+            verticals=["ecommerce", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.transaction_features and transaction.transaction_features.merchant:
+            rate = transaction.transaction_features.merchant.merchant_refund_rate
+            if rate and rate > 0.10:  # >10% refund rate
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.68, message=f"Merchant refund rate: {rate:.1%}")
+        return None
+
+class MultipleCardsDeviceRule(FraudRule):
+    """Multiple cards used on same device"""
+    def __init__(self):
+        super().__init__(
+            name="multiple_cards_device",
+            description="Multiple cards linked to device",
+            base_score=25,
+            severity="medium",
+            verticals=["ecommerce", "payments", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.transaction_features and transaction.transaction_features.card:
+            count = transaction.transaction_features.card.multiple_cards_same_device
+            if count and count > 5:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.72, message=f"Device linked to {count} cards")
+        return None
+
+class CardBINMismatchRule(FraudRule):
+    """Card BIN doesn't match stated country"""
+    def __init__(self):
+        super().__init__(
+            name="card_bin_mismatch",
+            description="Card issuing country suspicious",
+            base_score=19,
+            severity="low",
+            verticals=["ecommerce", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.transaction_features and transaction.transaction_features.card:
+            card_country = transaction.transaction_features.card.card_country
+            user_country = transaction.country
+            if card_country and user_country and card_country.lower() != user_country.lower():
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.63, message=f"Card ({card_country}) != user country ({user_country})")
+        return None
+
+class ExpiredCardRule(FraudRule):
+    """Card is expired or expiring soon"""
+    def __init__(self):
+        super().__init__(
+            name="expired_card",
+            description="Card expired or expiring soon",
+            base_score=23,
+            severity="medium",
+            verticals=["ecommerce", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        expiry = context.get("card_expiry_months_remaining", 12)
+        if expiry < 1:
+            return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.78, message="Card expired or expiring")
+        return None
+
+class DigitalGoodsHighAmountRule(FraudRule):
+    """High-value digital goods transaction"""
+    def __init__(self):
+        super().__init__(
+            name="digital_goods_high_amount",
+            description="High-value digital goods",
+            base_score=21,
+            severity="medium",
+            verticals=["ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        is_digital = context.get("is_digital_goods", False)
+        if is_digital and transaction.amount > 1000000:
+            return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.70, message=f"High-value digital goods: ₦{transaction.amount:,.0f}")
+        return None
+
+class BulkDigitalGoodsRule(FraudRule):
+    """Bulk digital goods purchase"""
+    def __init__(self):
+        super().__init__(
+            name="bulk_digital_goods",
+            description="Bulk digital goods purchase",
+            base_score=24,
+            severity="medium",
+            verticals=["ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        is_digital = context.get("is_digital_goods", False)
+        quantity = context.get("item_quantity", 1)
+        if is_digital and quantity > 50:
+            return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.72, message=f"Bulk digital goods: {quantity} items")
+        return None
+
+class FirstTimeCardRule(FraudRule):
+    """Card used for first time"""
+    def __init__(self):
+        super().__init__(
+            name="first_time_card",
+            description="Card used for first time",
+            base_score=18,
+            severity="low",
+            verticals=["ecommerce", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        previous_txns = context.get("card_previous_transactions", 1)
+        if previous_txns == 0:
+            return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.60, message="Card used for first time")
+        return None
+
+class CardVelocityRule(FraudRule):
+    """Card velocity is suspicious"""
+    def __init__(self):
+        super().__init__(
+            name="card_velocity",
+            description="Multiple transactions on card in short time",
+            base_score=22,
+            severity="medium",
+            verticals=["ecommerce", "payments", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        card_txns_hour = context.get("card_transactions_last_hour", 0)
+        if card_txns_hour > 5:
+            return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.75, message=f"Card velocity: {card_txns_hour} txns/hour")
+        return None
+
+class DuplicateTransactionRule(FraudRule):
+    """Duplicate transaction detected"""
+    def __init__(self):
+        super().__init__(
+            name="duplicate_transaction",
+            description="Same transaction duplicated",
+            base_score=26,
+            severity="high",
+            verticals=["ecommerce", "payments", "betting", "crypto"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        is_duplicate = context.get("is_duplicate_transaction", False)
+        if is_duplicate:
+            return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.95, message="Duplicate transaction detected")
+        return None
+
+class TransactionAmountMismatchRule(FraudRule):
+    """Amount doesn't match merchant receipt"""
+    def __init__(self):
+        super().__init__(
+            name="transaction_amount_mismatch",
+            description="Amount discrepancy with merchant",
+            base_score=28,
+            severity="high",
+            verticals=["ecommerce", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        expected_amount = context.get("expected_transaction_amount")
+        if expected_amount and abs(transaction.amount - expected_amount) > 1000:
+            return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.80, message=f"Amount mismatch: ₦{transaction.amount:,.0f} vs ₦{expected_amount:,.0f}")
+        return None
+
+class RoundAmountSuspiciousRule(FraudRule):
+    """Round amount transaction"""
+    def __init__(self):
+        super().__init__(
+            name="round_amount_suspicious",
+            description="Suspiciously round amount",
+            base_score=14,
+            severity="low",
+            verticals=["ecommerce", "payments", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.amount > 0 and transaction.amount % 100000 == 0:  # Perfect round number
+            return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.55, message=f"Suspiciously round amount: ₦{transaction.amount:,.0f}")
+        return None
+
+# ============================================================================
+# PHASE 7: EXTENDED NETWORK RULES (35+ additional rules)
+# ============================================================================
+
+class ConsortiumEmailFrequencyRule(FraudRule):
+    """Email seen at many lenders recently"""
+    def __init__(self):
+        super().__init__(
+            name="consortium_email_frequency",
+            description="Email appearing at multiple lenders",
+            base_score=30,
+            severity="high",
+            verticals=["lending", "fintech", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.network_features and transaction.network_features.consortium_matching:
+            if transaction.network_features.consortium_matching.email_seen_elsewhere:
+                count = context.get("email_lender_count", 2)
+                if count > 3:
+                    return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.85, message=f"Email at {count} other lenders")
+        return None
+
+class ConsortiumPhoneFrequencyRule(FraudRule):
+    """Phone seen at many lenders"""
+    def __init__(self):
+        super().__init__(
+            name="consortium_phone_frequency",
+            description="Phone at multiple lenders",
+            base_score=28,
+            severity="high",
+            verticals=["lending", "fintech", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.network_features and transaction.network_features.consortium_matching:
+            if transaction.network_features.consortium_matching.phone_seen_elsewhere:
+                count = context.get("phone_lender_count", 2)
+                if count > 3:
+                    return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.82, message=f"Phone at {count} other lenders")
+        return None
+
+class ConsortiumDeviceFrequencyRule(FraudRule):
+    """Device seen at many institutions"""
+    def __init__(self):
+        super().__init__(
+            name="consortium_device_frequency",
+            description="Device at multiple institutions",
+            base_score=32,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.network_features and transaction.network_features.consortium_matching:
+            if transaction.network_features.consortium_matching.device_seen_elsewhere:
+                count = context.get("device_institution_count", 2)
+                if count > 5:
+                    return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.85, message=f"Device at {count} institutions")
+        return None
+
+class ConsortiumBVNFrequencyRule(FraudRule):
+    """BVN seen with multiple identities"""
+    def __init__(self):
+        super().__init__(
+            name="consortium_bvn_frequency",
+            description="BVN linked to multiple accounts",
+            base_score=35,
+            severity="critical",
+            verticals=["lending", "fintech", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.network_features and transaction.network_features.consortium_matching:
+            if transaction.network_features.consortium_matching.bvn_seen_elsewhere:
+                count = context.get("bvn_account_count", 2)
+                if count > 2:
+                    return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.92, message=f"BVN linked to {count} accounts")
+        return None
+
+class NetworkVelocityEmailRule(FraudRule):
+    """High velocity across email"""
+    def __init__(self):
+        super().__init__(
+            name="network_velocity_email",
+            description="High transaction velocity on email",
+            base_score=26,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.network_features and transaction.network_features.velocity:
+            velocity = transaction.network_features.velocity.velocity_email
+            if velocity and velocity > 10:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.80, message=f"Email velocity: {velocity} txns")
+        return None
+
+class NetworkVelocityPhoneRule(FraudRule):
+    """High velocity across phone"""
+    def __init__(self):
+        super().__init__(
+            name="network_velocity_phone",
+            description="High transaction velocity on phone",
+            base_score=28,
+            severity="high",
+            verticals=["lending", "fintech", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.network_features and transaction.network_features.velocity:
+            velocity = transaction.network_features.velocity.velocity_phone
+            if velocity and velocity > 10:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.82, message=f"Phone velocity: {velocity} txns")
+        return None
+
+class NetworkVelocityDeviceRule(FraudRule):
+    """High velocity across device"""
+    def __init__(self):
+        super().__init__(
+            name="network_velocity_device",
+            description="High transaction velocity on device",
+            base_score=30,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce", "crypto"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.network_features and transaction.network_features.velocity:
+            velocity = transaction.network_features.velocity.velocity_device
+            if velocity and velocity > 15:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.85, message=f"Device velocity: {velocity} txns")
+        return None
+
+class NetworkVelocityIPRule(FraudRule):
+    """High velocity across IP"""
+    def __init__(self):
+        super().__init__(
+            name="network_velocity_ip",
+            description="High transaction velocity on IP",
+            base_score=28,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.network_features and transaction.network_features.velocity:
+            velocity = transaction.network_features.velocity.velocity_ip
+            if velocity and velocity > 20:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.80, message=f"IP velocity: {velocity} txns")
+        return None
+
+class SameIPMultipleUsersRule(FraudRule):
+    """Multiple users from same IP"""
+    def __init__(self):
+        super().__init__(
+            name="same_ip_multiple_users",
+            description="Multiple users on same IP",
+            base_score=25,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.network_features and transaction.network_features.graph_analysis:
+            count = transaction.network_features.graph_analysis.same_ip_multiple_users
+            if count and count > 10:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.75, message=f"{count} users on same IP")
+        return None
+
+class SameDeviceMultipleUsersRule(FraudRule):
+    """Multiple users on same device"""
+    def __init__(self):
+        super().__init__(
+            name="same_device_multiple_users",
+            description="Multiple users on same device",
+            base_score=32,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce", "crypto"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.network_features and transaction.network_features.graph_analysis:
+            count = transaction.network_features.graph_analysis.same_device_multiple_users
+            if count and count > 5:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.85, message=f"{count} users on same device (loan stacking)")
+        return None
+
+class SameAddressMultipleUsersRule(FraudRule):
+    """Multiple users at same address"""
+    def __init__(self):
+        super().__init__(
+            name="same_address_multiple_users",
+            description="Multiple users at same address",
+            base_score=24,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.network_features and transaction.network_features.graph_analysis:
+            count = transaction.network_features.graph_analysis.same_address_multiple_users
+            if count and count > 10:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.72, message=f"{count} users at same address")
+        return None
+
+class EmailFraudHistoryRule(FraudRule):
+    """Email linked to confirmed fraud"""
+    def __init__(self):
+        super().__init__(
+            name="email_fraud_history",
+            description="Email linked to fraud cases",
+            base_score=35,
+            severity="critical",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.network_features and transaction.network_features.fraud_linkage:
+            if transaction.network_features.fraud_linkage.email_linked_to_fraud:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.95, message="Email linked to confirmed fraud")
+        return None
+
+class PhoneFraudHistoryRule(FraudRule):
+    """Phone linked to confirmed fraud"""
+    def __init__(self):
+        super().__init__(
+            name="phone_fraud_history",
+            description="Phone linked to fraud cases",
+            base_score=34,
+            severity="critical",
+            verticals=["lending", "fintech", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.network_features and transaction.network_features.fraud_linkage:
+            if transaction.network_features.fraud_linkage.phone_linked_to_fraud:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.94, message="Phone linked to confirmed fraud")
+        return None
+
+class DeviceFraudHistoryRule(FraudRule):
+    """Device linked to confirmed fraud"""
+    def __init__(self):
+        super().__init__(
+            name="device_fraud_history",
+            description="Device linked to fraud cases",
+            base_score=36,
+            severity="critical",
+            verticals=["lending", "fintech", "payments", "ecommerce", "crypto"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.network_features and transaction.network_features.fraud_linkage:
+            if transaction.network_features.fraud_linkage.device_linked_to_fraud:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.96, message="Device linked to confirmed fraud")
+        return None
+
+class AddressFraudHistoryRule(FraudRule):
+    """Address linked to confirmed fraud"""
+    def __init__(self):
+        super().__init__(
+            name="address_fraud_history",
+            description="Address linked to fraud cases",
+            base_score=32,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.network_features and transaction.network_features.fraud_linkage:
+            if transaction.network_features.fraud_linkage.address_linked_to_fraud:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.88, message="Address linked to confirmed fraud")
+        return None
+
+class ConnectedAccountsDetectedRule(FraudRule):
+    """Connected accounts detected via graph analysis"""
+    def __init__(self):
+        super().__init__(
+            name="connected_accounts_detected",
+            description="Connected accounts via graph analysis",
+            base_score=28,
+            severity="high",
+            verticals=["lending", "fintech", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.network_features and transaction.network_features.graph_analysis:
+            if transaction.network_features.graph_analysis.connected_accounts_detected:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.80, message="Connected accounts detected")
+        return None
+
+# ============================================================================
+# PHASE 8: EXTENDED ATO SIGNALS (20+ additional rules)
+# ============================================================================
+
+class FailedLoginVelocityATORule(FraudRule):
+    """High failed login velocity (brute force)"""
+    def __init__(self):
+        super().__init__(
+            name="failed_login_velocity_ato",
+            description="High failed login velocity",
+            base_score=34,
+            severity="critical",
+            verticals=["lending", "fintech", "payments", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.ato_signals and transaction.ato_signals.classic_patterns:
+            velocity = transaction.ato_signals.classic_patterns.failed_login_velocity
+            if velocity and velocity > 10:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.88, message=f"Failed login velocity: {velocity} attempts/min")
+        return None
+
+class NewDeviceHighValueATORule(FraudRule):
+    """New device with high-value transaction"""
+    def __init__(self):
+        super().__init__(
+            name="new_device_high_value_ato",
+            description="New device with large transaction",
+            base_score=32,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.ato_signals and transaction.ato_signals.classic_patterns:
+            if transaction.ato_signals.classic_patterns.new_device_high_value:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.82, message="New device with high-value transaction")
+        return None
+
+class GeographicImpossibilityATORule(FraudRule):
+    """Impossible travel pattern"""
+    def __init__(self):
+        super().__init__(
+            name="geographic_impossibility_ato",
+            description="Geographically impossible travel",
+            base_score=35,
+            severity="critical",
+            verticals=["lending", "fintech", "payments", "betting", "crypto"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.ato_signals and transaction.ato_signals.classic_patterns:
+            if transaction.ato_signals.classic_patterns.geographic_impossibility:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.90, message="Geographically impossible travel detected")
+        return None
+
+class TypingPatternDeviationRule(FraudRule):
+    """Typing pattern deviates from user baseline"""
+    def __init__(self):
+        super().__init__(
+            name="typing_pattern_deviation",
+            description="Typing pattern deviates from baseline",
+            base_score=26,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.ato_signals and transaction.ato_signals.behavioral_deviation:
+            if transaction.ato_signals.behavioral_deviation.typing_pattern_deviation:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.78, message="Typing pattern deviates from baseline")
+        return None
+
+class MouseMovementDeviationRule(FraudRule):
+    """Mouse movement pattern deviates"""
+    def __init__(self):
+        super().__init__(
+            name="mouse_movement_deviation",
+            description="Mouse movement deviates from baseline",
+            base_score=24,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.ato_signals and transaction.ato_signals.behavioral_deviation:
+            if transaction.ato_signals.behavioral_deviation.mouse_movement_deviation:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.72, message="Mouse movement deviates from baseline")
+        return None
+
+class TransactionPatternDeviationRule(FraudRule):
+    """Transaction pattern deviates significantly"""
+    def __init__(self):
+        super().__init__(
+            name="transaction_pattern_deviation",
+            description="Transaction pattern deviates from baseline",
+            base_score=28,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.ato_signals and transaction.ato_signals.behavioral_deviation:
+            if transaction.ato_signals.behavioral_deviation.transaction_pattern_deviation:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.80, message="Transaction pattern deviates from baseline")
+        return None
+
+class TimeOfDayDeviationRule(FraudRule):
+    """Transaction time deviates from user pattern"""
+    def __init__(self):
+        super().__init__(
+            name="time_of_day_deviation",
+            description="Transaction time pattern changed",
+            base_score=22,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.ato_signals and transaction.ato_signals.behavioral_deviation:
+            if transaction.ato_signals.behavioral_deviation.time_of_day_deviation:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.68, message="Time of day pattern changed")
+        return None
+
+# ============================================================================
+# PHASE 9: EXTENDED FUNDING FRAUD RULES (15+ additional rules)
+# ============================================================================
+
+class NewCardWithdrawalSameDayRule(FraudRule):
+    """Card added and withdrawn same day"""
+    def __init__(self):
+        super().__init__(
+            name="new_card_withdrawal_same_day",
+            description="Card added and withdrawn same day",
+            base_score=32,
+            severity="high",
+            verticals=["lending", "fintech", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.funding_fraud_signals and transaction.funding_fraud_signals.new_sources:
+            if transaction.funding_fraud_signals.new_sources.card_added_withdrew_same_day:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.85, message="Card added and withdrawn same day")
+        return None
+
+class BINAttackPatternRule(FraudRule):
+    """BIN attack pattern detected"""
+    def __init__(self):
+        super().__init__(
+            name="bin_attack_pattern",
+            description="BIN testing attack detected",
+            base_score=30,
+            severity="high",
+            verticals=["ecommerce", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.funding_fraud_signals and transaction.funding_fraud_signals.card_testing:
+            if transaction.funding_fraud_signals.card_testing.bin_attack_pattern:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.88, message="BIN attack pattern detected")
+        return None
+
+class DollarOneAuthorizationRule(FraudRule):
+    """$1 test authorizations detected"""
+    def __init__(self):
+        super().__init__(
+            name="dollar_one_authorization",
+            description="Multiple $1 test authorizations",
+            base_score=28,
+            severity="high",
+            verticals=["ecommerce", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.funding_fraud_signals and transaction.funding_fraud_signals.card_testing:
+            count = transaction.funding_fraud_signals.card_testing.dollar_one_authorizations
+            if count and count > 3:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.82, message=f"$1 test auths: {count}")
+        return None
+
+class SmallFailsLargeSuccessRule(FraudRule):
+    """Small failed transactions followed by large successful"""
+    def __init__(self):
+        super().__init__(
+            name="small_fails_large_success",
+            description="Small fails then large success pattern",
+            base_score=29,
+            severity="high",
+            verticals=["ecommerce", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.funding_fraud_signals and transaction.funding_fraud_signals.card_testing:
+            if transaction.funding_fraud_signals.card_testing.small_fails_large_success:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.84, message="Small fails then large success pattern")
+        return None
+
+class MultipleSourcesAddedQuicklyRule(FraudRule):
+    """Multiple funding sources added rapidly"""
+    def __init__(self):
+        super().__init__(
+            name="multiple_sources_added_quickly",
+            description="Multiple funding sources added rapidly",
+            base_score=26,
+            severity="high",
+            verticals=["lending", "fintech", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.funding_fraud_signals and transaction.funding_fraud_signals.new_sources:
+            if transaction.funding_fraud_signals.new_sources.multiple_sources_added_quickly:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.78, message="Multiple funding sources added rapidly")
+        return None
+
+class HighRiskCountryFundingRule(FraudRule):
+    """Funding from high-risk country"""
+    def __init__(self):
+        super().__init__(
+            name="high_risk_country_funding",
+            description="Funding source from high-risk country",
+            base_score=24,
+            severity="medium",
+            verticals=["lending", "fintech", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.funding_fraud_signals and transaction.funding_fraud_signals.new_sources:
+            if transaction.funding_fraud_signals.new_sources.funding_source_high_risk_country:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.72, message="Funding from high-risk country")
+        return None
+
+# ============================================================================
+# PHASE 10: EXTENDED MERCHANT ABUSE RULES (15+ additional rules)
+# ============================================================================
+
+class RefundAbuseDetectedRule(FraudRule):
+    """Refund abuse pattern detected"""
+    def __init__(self):
+        super().__init__(
+            name="refund_abuse_detected",
+            description="Refund abuse pattern",
+            base_score=26,
+            severity="high",
+            verticals=["ecommerce", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.merchant_abuse_signals and transaction.merchant_abuse_signals.abuse_patterns:
+            if transaction.merchant_abuse_signals.abuse_patterns.refund_abuse_detected:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.80, message="Refund abuse pattern detected")
+        return None
+
+class CashbackAbuseDetectedRule(FraudRule):
+    """Cashback abuse pattern detected"""
+    def __init__(self):
+        super().__init__(
+            name="cashback_abuse_detected",
+            description="Cashback abuse pattern",
+            base_score=23,
+            severity="medium",
+            verticals=["ecommerce", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.merchant_abuse_signals and transaction.merchant_abuse_signals.abuse_patterns:
+            if transaction.merchant_abuse_signals.abuse_patterns.cashback_abuse_detected:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.75, message="Cashback abuse pattern detected")
+        return None
+
+class PromoAbuseDetectedRule(FraudRule):
+    """Promotion abuse pattern detected"""
+    def __init__(self):
+        super().__init__(
+            name="promo_abuse_detected",
+            description="Promo abuse pattern",
+            base_score=22,
+            severity="medium",
+            verticals=["ecommerce", "betting", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.merchant_abuse_signals and transaction.merchant_abuse_signals.abuse_patterns:
+            if transaction.merchant_abuse_signals.abuse_patterns.promo_abuse_detected:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.72, message="Promotion abuse pattern detected")
+        return None
+
+class LoyaltyPointsAbuseRule(FraudRule):
+    """Loyalty points abuse detected"""
+    def __init__(self):
+        super().__init__(
+            name="loyalty_points_abuse",
+            description="Loyalty points abuse pattern",
+            base_score=20,
+            severity="medium",
+            verticals=["ecommerce", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.merchant_abuse_signals and transaction.merchant_abuse_signals.abuse_patterns:
+            if transaction.merchant_abuse_signals.abuse_patterns.loyalty_points_abuse:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.70, message="Loyalty points abuse detected")
+        return None
+
+class ReferralFraudRule(FraudRule):
+    """Referral fraud detected"""
+    def __init__(self):
+        super().__init__(
+            name="referral_fraud",
+            description="Referral fraud pattern",
+            base_score=24,
+            severity="medium",
+            verticals=["fintech", "betting", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.merchant_abuse_signals and transaction.merchant_abuse_signals.abuse_patterns:
+            if transaction.merchant_abuse_signals.abuse_patterns.referral_fraud:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.74, message="Referral fraud detected")
+        return None
+
+class FakeMerchantTransactionsRule(FraudRule):
+    """Fake merchant transactions detected"""
+    def __init__(self):
+        super().__init__(
+            name="fake_merchant_transactions",
+            description="Fake merchant transactions",
+            base_score=28,
+            severity="high",
+            verticals=["ecommerce", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.merchant_abuse_signals and transaction.merchant_abuse_signals.abuse_patterns:
+            if transaction.merchant_abuse_signals.abuse_patterns.fake_merchant_transactions:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.82, message="Fake merchant transactions detected")
+        return None
+
+# ============================================================================
+# PHASE 11: EXTENDED ML-DERIVED RULES (10+ additional rules)
+# ============================================================================
+
+class OutlierScoreHighRule(FraudRule):
+    """High statistical outlier score"""
+    def __init__(self):
+        super().__init__(
+            name="outlier_score_high",
+            description="High statistical outlier score",
+            base_score=28,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.ml_derived_features and transaction.ml_derived_features.statistical_outliers:
+            score = transaction.ml_derived_features.statistical_outliers.outlier_score
+            if score and score > 0.8:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.82, message=f"Outlier score: {score:.2f}")
+        return None
+
+class XGBoostHighRiskRule(FraudRule):
+    """XGBoost model predicts high risk"""
+    def __init__(self):
+        super().__init__(
+            name="xgboost_high_risk",
+            description="XGBoost model high risk prediction",
+            base_score=32,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.ml_derived_features and transaction.ml_derived_features.model_scores:
+            score = transaction.ml_derived_features.model_scores.xgboost_risk_score
+            if score and score > 0.75:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.85, message=f"XGBoost risk: {score:.2f}")
+        return None
+
+class NeuralNetworkHighRiskRule(FraudRule):
+    """Neural network predicts high risk"""
+    def __init__(self):
+        super().__init__(
+            name="neural_network_high_risk",
+            description="Neural network high risk prediction",
+            base_score=30,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.ml_derived_features and transaction.ml_derived_features.model_scores:
+            score = transaction.ml_derived_features.model_scores.neural_network_score
+            if score and score > 0.75:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.83, message=f"NN risk: {score:.2f}")
+        return None
+
+class EnsembleModelConsensusRule(FraudRule):
+    """Multiple ML models agree on high risk"""
+    def __init__(self):
+        super().__init__(
+            name="ensemble_consensus",
+            description="Ensemble models agree on high risk",
+            base_score=38,
+            severity="critical",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.ml_derived_features and transaction.ml_derived_features.model_scores:
+            xgb = transaction.ml_derived_features.model_scores.xgboost_risk_score or 0
+            nn = transaction.ml_derived_features.model_scores.neural_network_score or 0
+            rf = transaction.ml_derived_features.model_scores.random_forest_score or 0
+            if xgb > 0.7 and nn > 0.7 and rf > 0.7:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.92, message="All ML models predict fraud")
+        return None
+
+class LSTMSequenceAnomalyRule(FraudRule):
+    """LSTM sequence model detects anomaly"""
+    def __init__(self):
+        super().__init__(
+            name="lstm_sequence_anomaly",
+            description="LSTM sequence anomaly detected",
+            base_score=26,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.ml_derived_features and transaction.ml_derived_features.deep_learning:
+            score = transaction.ml_derived_features.deep_learning.lstm_sequence_prediction
+            if score and score > 0.8:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.80, message=f"LSTM anomaly: {score:.2f}")
+        return None
+
+class GNNGraphAnomalyRule(FraudRule):
+    """Graph Neural Network detects anomaly"""
+    def __init__(self):
+        super().__init__(
+            name="gnn_graph_anomaly",
+            description="GNN graph anomaly detected",
+            base_score=31,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce", "crypto"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.ml_derived_features and transaction.ml_derived_features.deep_learning:
+            score = transaction.ml_derived_features.deep_learning.gnn_graph_score
+            if score and score > 0.75:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.83, message=f"GNN anomaly: {score:.2f}")
+        return None
+
+# ============================================================================
+# PHASE 12: EXTENDED DERIVED RULES (20+ additional rules)
+# ============================================================================
+
+class FraudsterProfileMatchRule(FraudRule):
+    """Profile matches known fraudster"""
+    def __init__(self):
+        super().__init__(
+            name="fraudster_profile_match",
+            description="Profile matches known fraudster",
+            base_score=38,
+            severity="critical",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.derived_features and transaction.derived_features.similarity:
+            similarity = transaction.derived_features.similarity.fraudster_profile_similarity
+            if similarity and similarity > 0.85:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.90, message=f"Fraudster match: {similarity:.2f}")
+        return None
+
+class EmailSimilarityHighRule(FraudRule):
+    """Email similar to known fraud case"""
+    def __init__(self):
+        super().__init__(
+            name="email_similarity_high",
+            description="Email similar to fraud cases",
+            base_score=26,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.derived_features and transaction.derived_features.similarity:
+            similarity = transaction.derived_features.similarity.email_similarity
+            if similarity and similarity > 0.8:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.78, message=f"Email similarity: {similarity:.2f}")
+        return None
+
+class BehaviorSimilarityHighRule(FraudRule):
+    """Behavior similar to known fraudster"""
+    def __init__(self):
+        super().__init__(
+            name="behavior_similarity_high",
+            description="Behavior similar to fraud cases",
+            base_score=28,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.derived_features and transaction.derived_features.similarity:
+            similarity = transaction.derived_features.similarity.behavior_similarity
+            if similarity and similarity > 0.8:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.80, message=f"Behavior similarity: {similarity:.2f}")
+        return None
+
+class FamilyConnectionDetectedRule(FraudRule):
+    """Family connections detected"""
+    def __init__(self):
+        super().__init__(
+            name="family_connection_detected",
+            description="Family connections detected",
+            base_score=24,
+            severity="medium",
+            verticals=["lending", "fintech", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.derived_features and transaction.derived_features.clustering:
+            if transaction.derived_features.clustering.family_connections_detected:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.72, message="Family connections detected")
+        return None
+
+class BusinessConnectionDetectedRule(FraudRule):
+    """Business connections detected"""
+    def __init__(self):
+        super().__init__(
+            name="business_connection_detected",
+            description="Business connections detected",
+            base_score=22,
+            severity="medium",
+            verticals=["lending", "fintech", "payments"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.derived_features and transaction.derived_features.clustering:
+            if transaction.derived_features.clustering.business_connections_detected:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.68, message="Business connections detected")
+        return None
+
+class GeographicConnectionDetectedRule(FraudRule):
+    """Geographic connections detected"""
+    def __init__(self):
+        super().__init__(
+            name="geographic_connection_detected",
+            description="Geographic connections detected",
+            base_score=20,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.derived_features and transaction.derived_features.clustering:
+            if transaction.derived_features.clustering.geographic_connections_detected:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.65, message="Geographic connections detected")
+        return None
+
+class FraudProbabilityHighRule(FraudRule):
+    """Aggregate fraud probability very high"""
+    def __init__(self):
+        super().__init__(
+            name="fraud_probability_high",
+            description="Fraud probability very high",
+            base_score=40,
+            severity="critical",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.derived_features and transaction.derived_features.aggregate_risk:
+            prob = transaction.derived_features.aggregate_risk.fraud_probability
+            if prob and prob > 0.9:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.95, message=f"Fraud probability: {prob:.1%}")
+        return None
+
+class RuleViolationCountHighRule(FraudRule):
+    """Many rules triggered"""
+    def __init__(self):
+        super().__init__(
+            name="rule_violation_count_high",
+            description="Many fraud rules triggered",
+            base_score=35,
+            severity="critical",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto"]
+        )
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.derived_features and transaction.derived_features.aggregate_risk:
+            count = transaction.derived_features.aggregate_risk.rule_violations_count
+            if count and count > 15:
+                return FraudFlag(type=self.name, severity=self.severity, score=self.base_score, confidence=0.92, message=f"{count} fraud rules triggered")
+        return None
+
+
 class FraudRulesEngine:
     """Main fraud detection rules engine"""
 
@@ -974,19 +2970,38 @@ class FraudRulesEngine:
             HighRiskCategoryRule(),
 
             # PHASE 1 FEATURES - 10 NEW RULES (Rules 30-39)
-            EmailDomainAgeRule(),              # Rule 30
-            SuspiciousIPReputationRule(),      # Rule 31
-            ExcessiveFailedLoginsRule(),       # Rule 32
-            UnusualTransactionTimeRule(),      # Rule 33
-            FirstTransactionAmountRule(),      # Rule 34
-            CardBINReputationRule(),           # Rule 35
-            UnverifiedPhoneRule(),             # Rule 36
-            MultipleDevicesSameUserRule(),     # Rule 37
-            QuickSignupTransactionRule(),      # Rule 38
-            OSInconsistencyRule(),             # Rule 39
-
-            # PHASE 4: IDENTITY FEATURES (40+ rules)
             EmailDomainAgeRule(),
+            SuspiciousIPReputationRule(),
+            ExcessiveFailedLoginsRule(),
+            UnusualTransactionTimeRule(),
+            FirstTransactionAmountRule(),
+            CardBINReputationRule(),
+            UnverifiedPhoneRule(),
+            MultipleDevicesSameUserRule(),
+            QuickSignupTransactionRule(),
+            OSInconsistencyRule(),
+
+            # PHASE 4: IDENTITY FEATURES (30+ new rules)
+            EmailDomainLegitimacyRule(),
+            EmailVerificationMismatchRule(),
+            PhoneVerificationFailureRule(),
+            PhoneCountryMismatchRule(),
+            BVNAgeInconsistencyRule(),
+            DeviceFingerprintChangeRule(),
+            BrowserVersionAnomalyRule(),
+            GPUFingerprintAnomalyRule(),
+            IPLocationConsistencyRule(),
+            ISPReputationRule(),
+            ASNBlacklistRule(),
+            MultipleEmailsDeviceRule(),
+            DeviceOSChangedRule(),
+            CanvasFingerprinterRule(),
+            WebGLFingerprintRule(),
+            FontListAnomalyRule(),
+            CPUCoreAnomalyRule(),
+            BatteryDrainAnomalyRule(),
+            TimezoneOffsetAnomalyRule(),
+            ScreenResolutionHistoryRule(),
             EmailReputationRule(),
             PhoneAgeRule(),
             PhoneCarrierRiskRule(),
@@ -1003,7 +3018,33 @@ class FraudRulesEngine:
             DeviceJailbreakDetectionRule(),
             DeviceBatteryLevelRule(),
 
-            # PHASE 5: BEHAVIORAL FEATURES (60+ rules)
+            # PHASE 5: BEHAVIORAL FEATURES (40+ new rules)
+            MouseMovementSuspiciousRule(),
+            TypingSpeedConstantRule(),
+            KeystrokeDynamicsFailureRule(),
+            CopyPasteAbuseRule(),
+            SessionDurationAnomalyRule(),
+            LoginFailureAccelerationRule(),
+            PasswordResetWithdrawalRule(),
+            TwoFactorBypassRule(),
+            BiometricAuthFailureRule(),
+            TransactionVelocityAccelerationRule(),
+            FirstTransactionAmountDeviation(),
+            UnusualTimingPatternRule(),
+            FormFillingSpeedRule(),
+            HesitationDetectionRule(),
+            ErrorCorrectionPatternRule(),
+            TabSwitchingRule(),
+            WindowResizeActivityRule(),
+            APIErrorVelocityRule(),
+            MobileGestureAnomalyRule(),
+            AppSwitchingRule(),
+            ScreenOrientationAnomalyRule(),
+            NotificationInteractionRule(),
+            PageRefreshAnomalyRule(),
+            DeepLinkBypassRule(),
+            CampaignTrackingAnomalyRule(),
+            ReferrerSourceAnomalyRule(),
             BehavioralMouseMovementRule(),
             BehavioralTypingSpeedRule(),
             BehavioralKeystrokeDynamicsRule(),
@@ -1018,7 +3059,28 @@ class FraudRulesEngine:
             BehavioralUnusualTimeRule(),
             BehavioralWeekendTransactionRule(),
 
-            # PHASE 6: TRANSACTION FEATURES (40+ rules)
+            # PHASE 6: TRANSACTION FEATURES (35+ new rules)
+            CardAgeNewRule(),
+            CardTestingPatternRule(),
+            CardReputationLowRule(),
+            NewBankAccountWithdrawalRule(),
+            BankAccountVerificationFailRule(),
+            AddressDistanceAnomalyRule(),
+            CryptoNewWalletHighValueRule(),
+            CryptoWithdrawalAfterDepositRule(),
+            MerchantHighRiskCategoryRule(),
+            MerchantChargebackRateRule(),
+            MerchantRefundRateRule(),
+            MultipleCardsDeviceRule(),
+            CardBINMismatchRule(),
+            ExpiredCardRule(),
+            DigitalGoodsHighAmountRule(),
+            BulkDigitalGoodsRule(),
+            FirstTimeCardRule(),
+            CardVelocityRule(),
+            DuplicateTransactionRule(),
+            TransactionAmountMismatchRule(),
+            RoundAmountSuspiciousRule(),
             TransactionCardNewRule(),
             TransactionCardTestingRule(),
             TransactionCardReputationRule(),
@@ -1028,7 +3090,23 @@ class FraudRulesEngine:
             TransactionCryptoHighValueWithdrawalRule(),
             TransactionMerchantHighRiskRule(),
 
-            # PHASE 7: NETWORK/CONSORTIUM FEATURES (40+ rules)
+            # PHASE 7: NETWORK/CONSORTIUM FEATURES (25+ new rules)
+            ConsortiumEmailFrequencyRule(),
+            ConsortiumPhoneFrequencyRule(),
+            ConsortiumDeviceFrequencyRule(),
+            ConsortiumBVNFrequencyRule(),
+            NetworkVelocityEmailRule(),
+            NetworkVelocityPhoneRule(),
+            NetworkVelocityDeviceRule(),
+            NetworkVelocityIPRule(),
+            SameIPMultipleUsersRule(),
+            SameDeviceMultipleUsersRule(),
+            SameAddressMultipleUsersRule(),
+            EmailFraudHistoryRule(),
+            PhoneFraudHistoryRule(),
+            DeviceFraudHistoryRule(),
+            AddressFraudHistoryRule(),
+            ConnectedAccountsDetectedRule(),
             NetworkEmailFraudLinkRule(),
             NetworkPhoneFraudLinkRule(),
             NetworkDeviceFraudLinkRule(),
@@ -1039,19 +3117,52 @@ class FraudRulesEngine:
             NetworkSyntheticIdentityRule(),
             NetworkMoneyMuleRule(),
 
-            # PHASE 8: ACCOUNT TAKEOVER SIGNALS (15+ rules)
+            # PHASE 8: ACCOUNT TAKEOVER SIGNALS (7+ new rules)
+            FailedLoginVelocityATORule(),
+            NewDeviceHighValueATORule(),
+            GeographicImpossibilityATORule(),
+            TypingPatternDeviationRule(),
+            MouseMovementDeviationRule(),
+            TransactionPatternDeviationRule(),
+            TimeOfDayDeviationRule(),
             ATOPasswordResetRule(),
 
-            # PHASE 9: FUNDING SOURCE FRAUD (10+ rules)
+            # PHASE 9: FUNDING SOURCE FRAUD (6+ new rules)
+            NewCardWithdrawalSameDayRule(),
+            BINAttackPatternRule(),
+            DollarOneAuthorizationRule(),
+            SmallFailsLargeSuccessRule(),
+            MultipleSourcesAddedQuicklyRule(),
+            HighRiskCountryFundingRule(),
             FundingSourceNewCardWithdrawalRule(),
 
-            # PHASE 10: MERCHANT-LEVEL ABUSE (10+ rules)
+            # PHASE 10: MERCHANT-LEVEL ABUSE (7+ new rules)
+            RefundAbuseDetectedRule(),
+            CashbackAbuseDetectedRule(),
+            PromoAbuseDetectedRule(),
+            LoyaltyPointsAbuseRule(),
+            ReferralFraudRule(),
+            FakeMerchantTransactionsRule(),
             MerchantRefundAbuseRule(),
 
-            # PHASE 11: ML-DERIVED FEATURES (9+ rules)
+            # PHASE 11: ML-DERIVED FEATURES (6+ new rules)
+            OutlierScoreHighRule(),
+            XGBoostHighRiskRule(),
+            NeuralNetworkHighRiskRule(),
+            EnsembleModelConsensusRule(),
+            LSTMSequenceAnomalyRule(),
+            GNNGraphAnomalyRule(),
             MLAnomalyScoreRule(),
 
-            # PHASE 12: DERIVED/COMPUTED FEATURES (25+ rules)
+            # PHASE 12: DERIVED/COMPUTED FEATURES (9+ new rules)
+            FraudsterProfileMatchRule(),
+            EmailSimilarityHighRule(),
+            BehaviorSimilarityHighRule(),
+            FamilyConnectionDetectedRule(),
+            BusinessConnectionDetectedRule(),
+            GeographicConnectionDetectedRule(),
+            FraudProbabilityHighRule(),
+            RuleViolationCountHighRule(),
             DerivedFraudsterSimilarityRule(),
             HighConfidenceFraudRule(),
         ]
