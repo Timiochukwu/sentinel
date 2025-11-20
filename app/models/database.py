@@ -45,6 +45,45 @@ class Transaction(Base):
     city = Column(String(100))
     country = Column(String(100))
 
+    # PHASE 1 FEATURES (10 new features for 70% fraud detection)
+    # 1. Email age/reputation
+    email_domain_age_days = Column(Integer)  # How old is the email domain
+    email_reputation_score = Column(Integer)  # 0-100 reputation score
+
+    # 2. IP reputation
+    ip_reputation_score = Column(Integer)  # 0-100, 100=clean, 0=known fraud IP
+
+    # 3. Failed login attempts
+    failed_login_count_24h = Column(Integer, default=0)  # Failed logins in 24h
+    failed_login_count_7d = Column(Integer, default=0)   # Failed logins in 7 days
+    last_failed_login_at = Column(TIMESTAMP)
+
+    # 4. Time of day analysis
+    transaction_hour = Column(Integer)  # Hour of transaction (0-23)
+    is_unusual_time = Column(Boolean, default=False)  # Outside normal hours
+
+    # 5. First transaction amount
+    first_transaction_amount = Column(Numeric(15, 2))  # User's first transaction amount
+
+    # 6. Card BIN reputation (stored here for quick access)
+    card_bin_reputation_score = Column(Integer)  # 0-100 reputation
+
+    # 7. Phone verification status
+    phone_verified = Column(Boolean, default=False)
+    phone_verified_at = Column(TIMESTAMP)
+    phone_verification_method = Column(String(50))  # sms, call, app
+
+    # 8. Multiple accounts same device (already have device_fingerprint)
+    # Can be calculated from device_fingerprint count
+
+    # 9. Transaction vs signup time gap
+    account_signup_date = Column(TIMESTAMP)  # When account was created
+    days_since_signup = Column(Integer)  # Calculated field: now - signup_date
+
+    # 10. Platform/OS consistency
+    platform_os = Column(String(100))  # "iOS 14.5", "Android 11", "Windows 10", "macOS Big Sur"
+    platform_os_consistent = Column(Boolean)  # Same OS as usual
+
     # Detection outputs
     risk_score = Column(Integer, index=True)
     risk_level = Column(String(20))  # low, medium, high

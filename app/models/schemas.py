@@ -42,6 +42,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field, validator
 from decimal import Decimal
 from enum import Enum
+# datetime already imported above
 
 
 # ============================================================================
@@ -245,6 +246,40 @@ class TransactionCheckRequest(BaseModel):
     seller_account_age_days: Optional[int] = Field(None, description="Seller account age", ge=0)
     product_category: Optional[str] = Field(None, description="Product category")
     is_high_value_item: Optional[bool] = Field(None, description="Item value >₦100k")
+
+    # PHASE 1 FEATURES (10 new fraud detection features)
+    # 1. Email age/reputation
+    email_domain_age_days: Optional[int] = Field(None, description="Email domain age in days", ge=0)
+    email_reputation_score: Optional[int] = Field(None, description="Email reputation 0-100", ge=0, le=100)
+
+    # 2. IP reputation
+    ip_reputation_score: Optional[int] = Field(None, description="IP reputation 0-100", ge=0, le=100)
+
+    # 3. Failed login attempts
+    failed_login_count_24h: Optional[int] = Field(0, description="Failed logins in 24h", ge=0)
+    failed_login_count_7d: Optional[int] = Field(0, description="Failed logins in 7 days", ge=0)
+
+    # 4. Time of day analysis
+    transaction_hour: Optional[int] = Field(None, description="Hour of transaction (0-23)", ge=0, le=23)
+    is_unusual_time: Optional[bool] = Field(False, description="Transaction at unusual hours")
+
+    # 5. First transaction amount
+    first_transaction_amount: Optional[float] = Field(None, description="User's first transaction amount", ge=0)
+
+    # 6. Card BIN reputation
+    card_bin_reputation_score: Optional[int] = Field(None, description="Card BIN reputation 0-100", ge=0, le=100)
+
+    # 7. Phone verification status
+    phone_verified: Optional[bool] = Field(False, description="Is phone number verified")
+    phone_verification_method: Optional[str] = Field(None, description="Verification method (sms, call, app)")
+
+    # 9. Transaction vs signup time gap
+    account_signup_date: Optional[datetime] = Field(None, description="When account was created")
+    days_since_signup: Optional[int] = Field(None, description="Days since account signup", ge=0)
+
+    # 10. Platform/OS consistency
+    platform_os: Optional[str] = Field(None, description="Platform/OS (iOS 14.5, Android 11, Windows 10, etc)")
+    platform_os_consistent: Optional[bool] = Field(None, description="Is OS consistent with user history")
 
     class Config:
         json_schema_extra = {

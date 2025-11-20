@@ -866,6 +866,18 @@ class FraudRulesEngine:
             NewSellerHighValueRule(),
             LowRatedSellerRule(),
             HighRiskCategoryRule(),
+
+            # PHASE 1 FEATURES - 10 NEW RULES (Rules 30-39)
+            EmailDomainAgeRule(),              # Rule 30
+            SuspiciousIPReputationRule(),      # Rule 31
+            ExcessiveFailedLoginsRule(),       # Rule 32
+            UnusualTransactionTimeRule(),      # Rule 33
+            FirstTransactionAmountRule(),      # Rule 34
+            CardBINReputationRule(),           # Rule 35
+            UnverifiedPhoneRule(),             # Rule 36
+            MultipleDevicesSameUserRule(),     # Rule 37
+            QuickSignupTransactionRule(),      # Rule 38
+            OSInconsistencyRule(),             # Rule 39
         ]
 
     def get_rules_for_vertical(self, industry: str) -> List[FraudRule]:
@@ -939,3 +951,270 @@ class FraudRulesEngine:
     def get_all_rule_names(self) -> List[str]:
         """Get all rule names"""
         return [rule.name for rule in self.rules]
+
+
+# ============================================================================
+# PHASE 1 FEATURES - 10 NEW RULES (Rules 30-39) for 70% Fraud Detection
+# ============================================================================
+
+class EmailDomainAgeRule(FraudRule):
+    """Rule 30: Email Domain Age - Newly created email domains"""
+
+    def __init__(self):
+        super().__init__(
+            name="email_domain_age",
+            description="Email from newly created domain",
+            base_score=25,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.email_domain_age_days is not None:
+            if transaction.email_domain_age_days < 30:  # Less than 30 days old
+                return FraudFlag(
+                    type=self.name,
+                    severity=self.severity,
+                    message=f"Email domain only {transaction.email_domain_age_days} days old",
+                    score=self.base_score,
+                    confidence=0.76
+                )
+        return None
+
+
+class SuspiciousIPReputationRule(FraudRule):
+    """Rule 31: IP Reputation - Poor IP reputation score"""
+
+    def __init__(self):
+        super().__init__(
+            name="suspicious_ip_reputation",
+            description="IP address with poor reputation",
+            base_score=35,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.ip_reputation_score is not None:
+            if transaction.ip_reputation_score < 30:  # Low reputation (0-30)
+                return FraudFlag(
+                    type=self.name,
+                    severity=self.severity,
+                    message=f"IP reputation score {transaction.ip_reputation_score}/100 - high risk",
+                    score=self.base_score,
+                    confidence=0.88
+                )
+        return None
+
+
+class ExcessiveFailedLoginsRule(FraudRule):
+    """Rule 32: Excessive Failed Logins - Account takeover indicator"""
+
+    def __init__(self):
+        super().__init__(
+            name="excessive_failed_logins",
+            description="Too many failed login attempts",
+            base_score=40,
+            severity="critical",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.failed_login_count_24h and transaction.failed_login_count_24h >= 5:
+            return FraudFlag(
+                type=self.name,
+                severity=self.severity,
+                message=f"{transaction.failed_login_count_24h} failed logins in 24h - possible account takeover",
+                score=self.base_score,
+                confidence=0.92
+            )
+        if transaction.failed_login_count_7d and transaction.failed_login_count_7d >= 10:
+            return FraudFlag(
+                type=self.name,
+                severity=self.severity,
+                message=f"{transaction.failed_login_count_7d} failed logins in 7 days",
+                score=self.base_score - 10,  # Slightly lower for 7-day pattern
+                confidence=0.85
+            )
+        return None
+
+
+class UnusualTransactionTimeRule(FraudRule):
+    """Rule 33: Unusual Transaction Time - Outside normal user hours"""
+
+    def __init__(self):
+        super().__init__(
+            name="unusual_transaction_time",
+            description="Transaction at unusual time for user",
+            base_score=20,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.is_unusual_time:
+            hour = transaction.transaction_hour or 0
+            return FraudFlag(
+                type=self.name,
+                severity=self.severity,
+                message=f"Transaction at {hour:02d}:00 - unusual time for user",
+                score=self.base_score,
+                confidence=0.68
+            )
+        return None
+
+
+class FirstTransactionAmountRule(FraudRule):
+    """Rule 34: First Transaction Amount - Suspiciously large first transaction"""
+
+    def __init__(self):
+        super().__init__(
+            name="first_transaction_amount",
+            description="First transaction amount unusually large",
+            base_score=25,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.first_transaction_amount is not None:
+            if transaction.first_transaction_amount > 500000:  # First transaction > ₦500k
+                avg_transaction = context.get("average_transaction_amount", 0)
+                if avg_transaction > 0:
+                    ratio = transaction.first_transaction_amount / avg_transaction
+                    if ratio > 5:  # First transaction 5x larger than user's average
+                        return FraudFlag(
+                            type=self.name,
+                            severity=self.severity,
+                            message=f"First transaction ₦{transaction.first_transaction_amount:,.0f} - {ratio:.1f}x user average",
+                            score=self.base_score,
+                            confidence=0.74
+                        )
+        return None
+
+
+class CardBINReputationRule(FraudRule):
+    """Rule 35: Card BIN Reputation - Card from suspicious BIN"""
+
+    def __init__(self):
+        super().__init__(
+            name="card_bin_reputation",
+            description="Card BIN with poor reputation",
+            base_score=30,
+            severity="high",
+            verticals=["ecommerce", "fintech", "payments"]
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.card_bin_reputation_score is not None:
+            if transaction.card_bin_reputation_score < 25:  # Very poor reputation
+                return FraudFlag(
+                    type=self.name,
+                    severity=self.severity,
+                    message=f"Card BIN reputation {transaction.card_bin_reputation_score}/100 - known fraud BIN",
+                    score=self.base_score,
+                    confidence=0.87
+                )
+        return None
+
+
+class UnverifiedPhoneRule(FraudRule):
+    """Rule 36: Unverified Phone - Transaction from unverified phone"""
+
+    def __init__(self):
+        super().__init__(
+            name="unverified_phone",
+            description="Transaction from unverified phone number",
+            base_score=25,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if not transaction.phone_verified:
+            if transaction.amount > 100000:  # Large transaction from unverified phone
+                return FraudFlag(
+                    type=self.name,
+                    severity=self.severity,
+                    message=f"₦{transaction.amount:,.0f} transaction from unverified phone number",
+                    score=self.base_score,
+                    confidence=0.79
+                )
+        return None
+
+
+class MultipleDevicesSameUserRule(FraudRule):
+    """Rule 37: Multiple Devices Same User - Many devices for one user"""
+
+    def __init__(self):
+        super().__init__(
+            name="multiple_devices_same_user",
+            description="Multiple devices used by same user",
+            base_score=20,
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        device_history = context.get("device_history", {})
+        unique_devices = device_history.get("unique_device_count", 1)
+
+        if unique_devices >= 7:  # 7+ different devices
+            return FraudFlag(
+                type=self.name,
+                severity=self.severity,
+                message=f"User has used {unique_devices} different devices - possible multi-accounting",
+                score=self.base_score,
+                confidence=0.65
+            )
+        return None
+
+
+class QuickSignupTransactionRule(FraudRule):
+    """Rule 38: Quick Signup Transaction - Transaction shortly after signup"""
+
+    def __init__(self):
+        super().__init__(
+            name="quick_signup_transaction",
+            description="Large transaction shortly after account creation",
+            base_score=30,
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.days_since_signup is not None:
+            if transaction.days_since_signup < 1:  # Transaction within 24 hours of signup
+                if transaction.amount > 100000:
+                    return FraudFlag(
+                        type=self.name,
+                        severity=self.severity,
+                        message=f"₦{transaction.amount:,.0f} transaction {transaction.days_since_signup} days after signup",
+                        score=self.base_score,
+                        confidence=0.85
+                    )
+        return None
+
+
+class OSInconsistencyRule(FraudRule):
+    """Rule 39: OS/Platform Inconsistency - Different OS than usual"""
+
+    def __init__(self):
+        super().__init__(
+            name="os_inconsistency",
+            description="Transaction from different OS/platform than usual",
+            base_score=20,
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.platform_os and not transaction.platform_os_consistent:
+            return FraudFlag(
+                type=self.name,
+                severity=self.severity,
+                message=f"Transaction from {transaction.platform_os} - inconsistent with user history",
+                score=self.base_score,
+                confidence=0.72
+            )
+        return None

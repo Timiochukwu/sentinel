@@ -831,6 +831,24 @@ class FraudDetector:
             city=transaction.city,
             country=transaction.country,
 
+            # PHASE 1 FEATURES (10 new features)
+            email_domain_age_days=transaction.email_domain_age_days,
+            email_reputation_score=transaction.email_reputation_score,
+            ip_reputation_score=transaction.ip_reputation_score,
+            failed_login_count_24h=transaction.failed_login_count_24h,
+            failed_login_count_7d=transaction.failed_login_count_7d,
+            transaction_hour=transaction.transaction_hour,
+            is_unusual_time=transaction.is_unusual_time,
+            first_transaction_amount=transaction.first_transaction_amount,
+            card_bin_reputation_score=transaction.card_bin_reputation_score,
+            phone_verified=transaction.phone_verified,
+            phone_verified_at=transaction.phone_verified_at,
+            phone_verification_method=transaction.phone_verification_method,
+            account_signup_date=transaction.account_signup_date,
+            days_since_signup=transaction.days_since_signup,
+            platform_os=transaction.platform_os,
+            platform_os_consistent=transaction.platform_os_consistent,
+
             # Fraud detection results
             risk_score=risk_score,
             risk_level=risk_level,
