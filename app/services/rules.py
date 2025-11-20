@@ -9,11 +9,14 @@ from app.models.schemas import FraudFlag, TransactionCheckRequest
 class FraudRule:
     """Base class for fraud detection rules"""
 
-    def __init__(self, name: str, description: str, base_score: int, severity: str):
+    def __init__(self, name: str, description: str, base_score: int, severity: str, verticals: List[str] = None):
         self.name = name
         self.description = description
         self.base_score = base_score
         self.severity = severity
+        # Vertical industries this rule applies to (e.g., ["lending", "fintech", "payments"])
+        # If None, rule applies to all verticals
+        self.verticals = verticals or ["lending", "fintech", "payments", "crypto", "ecommerce", "betting", "marketplace", "gaming"]
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
         """
@@ -28,6 +31,10 @@ class FraudRule:
         """
         raise NotImplementedError
 
+    def applies_to_vertical(self, industry: str) -> bool:
+        """Check if this rule applies to the given industry vertical"""
+        return industry in self.verticals
+
 
 class NewAccountLargeAmountRule(FraudRule):
     """Rule 1: New Account Large Amount - Account <7 days + amount >₦100k"""
@@ -37,7 +44,8 @@ class NewAccountLargeAmountRule(FraudRule):
             name="new_account_large_amount",
             description="New account with large transaction",
             base_score=30,
-            severity="medium"
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]  # Applies to most verticals
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -61,7 +69,8 @@ class LoanStackingRule(FraudRule):
             name="loan_stacking",
             description="Applied to multiple lenders recently",
             base_score=40,
-            severity="critical"
+            severity="critical",
+            verticals=["lending", "fintech", "payments"]  # Lending-specific
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -89,7 +98,8 @@ class SIMSwapPatternRule(FraudRule):
             name="sim_swap_pattern",
             description="Pattern indicating SIM swap attack",
             base_score=45,
-            severity="critical"
+            severity="critical",
+            verticals=["lending", "fintech", "payments"]  # Fintech-specific
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -113,7 +123,8 @@ class SuspiciousHoursRule(FraudRule):
             name="suspicious_hours",
             description="Transaction during suspicious hours",
             base_score=15,
-            severity="low"
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]  # Universal
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -137,7 +148,8 @@ class VelocityCheckRule(FraudRule):
             name="velocity_check",
             description="Too many transactions in short time",
             base_score=30,
-            severity="medium"
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]  # Universal
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -163,7 +175,8 @@ class ContactChangeWithdrawalRule(FraudRule):
             name="contact_change_withdrawal",
             description="Contact information changed before withdrawal",
             base_score=35,
-            severity="high"
+            severity="high",
+            verticals=["lending", "fintech", "payments", "betting", "crypto"]
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -188,7 +201,8 @@ class NewDeviceRule(FraudRule):
             name="new_device",
             description="First time device with large transaction",
             base_score=25,
-            severity="medium"
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -211,7 +225,8 @@ class RoundAmountRule(FraudRule):
             name="round_amount",
             description="Suspiciously round transaction amount",
             base_score=15,
-            severity="low"
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -237,7 +252,8 @@ class MaximumFirstTransactionRule(FraudRule):
             name="maximum_first_transaction",
             description="First transaction at maximum amount",
             base_score=25,
-            severity="medium"
+            severity="medium",
+            verticals=["lending", "fintech", "payments"]
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -262,7 +278,8 @@ class ImpossibleTravelRule(FraudRule):
             name="impossible_travel",
             description="Geographically impossible travel speed",
             base_score=30,
-            severity="high"
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -305,7 +322,8 @@ class VPNProxyRule(FraudRule):
             name="vpn_proxy",
             description="IP from known VPN/proxy service",
             base_score=20,
-            severity="low"
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
         )
         # Known VPN IP ranges (simplified - use a proper service like IPHub in production)
         self.vpn_indicators = ["10.", "172.", "192.168."]
@@ -331,7 +349,8 @@ class DisposableEmailRule(FraudRule):
             name="disposable_email",
             description="Disposable/temporary email address",
             base_score=20,
-            severity="low"
+            severity="low",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
         )
         self.disposable_domains = [
             "tempmail.com", "guerrillamail.com", "10minutemail.com",
@@ -361,7 +380,8 @@ class DeviceSharingRule(FraudRule):
             name="device_sharing",
             description="Device used by multiple accounts",
             base_score=35,
-            severity="high"
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -387,7 +407,8 @@ class DormantAccountActivationRule(FraudRule):
             name="dormant_account_activation",
             description="Long-dormant account suddenly active",
             base_score=20,
-            severity="medium"
+            severity="medium",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -410,7 +431,8 @@ class SequentialApplicationsRule(FraudRule):
             name="sequential_applications",
             description="Sequential email/user ID pattern",
             base_score=30,
-            severity="high"
+            severity="high",
+            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -438,7 +460,8 @@ class CardBINFraudRule(FraudRule):
             name="card_bin_fraud",
             description="Card from high-risk BIN",
             base_score=35,
-            severity="high"
+            severity="high",
+            verticals=["ecommerce", "fintech", "payments"]  # E-commerce specific
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -464,7 +487,8 @@ class MultipleFailedPaymentsRule(FraudRule):
             name="multiple_failed_payments",
             description="Multiple failed payment attempts",
             base_score=40,
-            severity="critical"
+            severity="critical",
+            verticals=["ecommerce", "fintech", "payments"]  # E-commerce specific
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -490,7 +514,8 @@ class ShippingMismatchRule(FraudRule):
             name="shipping_mismatch",
             description="Shipping and billing addresses don't match",
             base_score=25,
-            severity="medium"
+            severity="medium",
+            verticals=["ecommerce"]  # E-commerce specific
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -514,7 +539,8 @@ class DigitalGoodsHighValueRule(FraudRule):
             name="digital_goods_high_value",
             description="High-value digital goods purchase",
             base_score=20,
-            severity="medium"
+            severity="medium",
+            verticals=["ecommerce"]  # E-commerce specific
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -540,7 +566,8 @@ class BonusAbuseRule(FraudRule):
             name="bonus_abuse",
             description="Potential bonus abuse pattern",
             base_score=35,
-            severity="high"
+            severity="high",
+            verticals=["betting", "gaming"]  # Betting/gaming specific
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -568,7 +595,8 @@ class WithdrawalWithoutWageringRule(FraudRule):
             name="withdrawal_without_wagering",
             description="Withdrawal without sufficient wagering",
             base_score=45,
-            severity="critical"
+            severity="critical",
+            verticals=["betting", "gaming"]  # Betting/gaming specific
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -594,7 +622,8 @@ class ArbitrageBettingRule(FraudRule):
             name="arbitrage_betting",
             description="Arbitrage betting pattern detected",
             base_score=30,
-            severity="medium"
+            severity="medium",
+            verticals=["betting", "gaming"]  # Betting/gaming specific
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -617,7 +646,8 @@ class ExcessiveWithdrawalsRule(FraudRule):
             name="excessive_withdrawals",
             description="Too many withdrawal attempts",
             base_score=25,
-            severity="medium"
+            severity="medium",
+            verticals=["betting", "gaming", "lending", "fintech", "payments"]  # Common withdrawal fraud
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -642,7 +672,8 @@ class NewWalletHighValueRule(FraudRule):
             name="new_wallet_high_value",
             description="New crypto wallet with high-value transaction",
             base_score=35,
-            severity="high"
+            severity="high",
+            verticals=["crypto"]  # Crypto specific
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -665,7 +696,8 @@ class SuspiciousWalletRule(FraudRule):
             name="suspicious_wallet",
             description="Wallet address flagged as suspicious",
             base_score=50,
-            severity="critical"
+            severity="critical",
+            verticals=["crypto"]  # Crypto specific
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -691,7 +723,8 @@ class P2PVelocityRule(FraudRule):
             name="p2p_velocity",
             description="Excessive P2P trading activity",
             base_score=30,
-            severity="high"
+            severity="high",
+            verticals=["crypto"]  # Crypto specific
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -720,7 +753,8 @@ class NewSellerHighValueRule(FraudRule):
             name="new_seller_high_value",
             description="New seller listing high-value items",
             base_score=35,
-            severity="high"
+            severity="high",
+            verticals=["marketplace"]  # Marketplace specific
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -744,7 +778,8 @@ class LowRatedSellerRule(FraudRule):
             name="low_rated_seller",
             description="Seller has poor rating",
             base_score=25,
-            severity="medium"
+            severity="medium",
+            verticals=["marketplace"]  # Marketplace specific
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -768,7 +803,8 @@ class HighRiskCategoryRule(FraudRule):
             name="high_risk_category",
             description="High-risk product category",
             base_score=15,
-            severity="low"
+            severity="low",
+            verticals=["marketplace", "ecommerce"]  # Marketplace & e-commerce
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
@@ -832,25 +868,46 @@ class FraudRulesEngine:
             HighRiskCategoryRule(),
         ]
 
+    def get_rules_for_vertical(self, industry: str) -> List[FraudRule]:
+        """
+        Get all fraud rules that apply to a specific industry vertical
+
+        Args:
+            industry: Industry vertical (e.g., "lending", "crypto", "ecommerce")
+
+        Returns:
+            List of rules applicable to this vertical
+        """
+        return [rule for rule in self.rules if rule.applies_to_vertical(industry)]
+
     def evaluate(
         self,
         transaction: TransactionCheckRequest,
-        context: Dict[str, Any]
+        context: Dict[str, Any],
+        industry: str = None
     ) -> tuple[int, str, str, List[FraudFlag]]:
         """
-        Evaluate all fraud detection rules
+        Evaluate fraud detection rules for a specific industry vertical
 
         Args:
             transaction: Transaction data
             context: Additional context (consortium data, velocity data, etc.)
+            industry: Industry vertical (e.g., "lending", "crypto"). If None, uses transaction.industry
 
         Returns:
             Tuple of (risk_score, risk_level, decision, flags)
         """
+        # Use transaction's industry if not specified
+        if industry is None:
+            industry = str(transaction.industry) if hasattr(transaction.industry, 'value') else transaction.industry
+
         flags: List[FraudFlag] = []
 
-        # Run all rules
-        for rule in self.rules:
+        # Get rules for this vertical only
+        applicable_rules = self.get_rules_for_vertical(industry)
+
+        # Run vertical-specific rules
+        for rule in applicable_rules:
             flag = rule.check(transaction, context)
             if flag:
                 flags.append(flag)

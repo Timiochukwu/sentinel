@@ -185,12 +185,13 @@ class FraudDetector:
         # Think of this as pulling up the user's "file" before reviewing
         context = self._build_context(transaction)
 
-        # Step 2: Run all fraud detection rules
-        # The rules engine checks the transaction against 29 different rules
-        # Each rule that triggers adds to the risk score
-        # Example: "new_account_large_amount" rule might add 30 points
+        # Step 2: Run vertical-specific fraud detection rules
+        # The rules engine now filters rules by industry vertical
+        # For example, crypto rules only run for crypto transactions
+        # This improves accuracy by focusing on relevant fraud patterns
+        industry = str(transaction.industry) if hasattr(transaction.industry, 'value') else transaction.industry
         risk_score, risk_level, decision, flags = self.rules_engine.evaluate(
-            transaction, context
+            transaction, context, industry=industry
         )
 
         # Step 2.5: Run device fingerprint fraud rules (NEW!)
@@ -802,7 +803,8 @@ class FraudDetector:
 
             # Transaction details
             amount=transaction.amount,
-            transaction_type=transaction.transaction_type,
+            transaction_type=str(transaction.transaction_type) if hasattr(transaction.transaction_type, 'value') else transaction.transaction_type,
+            industry=str(transaction.industry) if hasattr(transaction.industry, 'value') else transaction.industry,  # Store industry vertical
 
             # Device and network info (hashed for privacy)
             device_id=device_hash,              # SHA-256 hash of device ID

@@ -178,11 +178,14 @@ class TransactionCheckRequest(BaseModel):
     transaction_id: str = Field(..., description="Unique transaction identifier")
     user_id: str = Field(..., description="User identifier")
     amount: float = Field(..., description="Transaction amount in Naira", ge=0)  # ge=0 means "greater than or equal to 0"
-    transaction_type: str = Field(
-        default="loan_disbursement",
+    transaction_type: TransactionType = Field(
+        default=TransactionType.LOAN_DISBURSEMENT,
         description="Type of transaction (loan_disbursement, purchase, bet_placement, etc.)"
     )
-    industry: Optional[str] = Field(None, description="Industry vertical (fintech, ecommerce, betting, crypto, marketplace)")
+    industry: Industry = Field(
+        default=Industry.LENDING,
+        description="Industry vertical (fintech, lending, crypto, ecommerce, betting, marketplace, gaming)"
+    )
 
     # Device and network info
     device_id: Optional[str] = Field(None, description="Device identifier")
@@ -257,7 +260,8 @@ class TransactionCheckRequest(BaseModel):
                 "transaction_count": 0,
                 "phone_changed_recently": True,
                 "email_changed_recently": False
-            }
+            },
+            "title": "Fraud Detection Request"
         }
 
 

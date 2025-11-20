@@ -24,6 +24,7 @@ class Transaction(Base):
     user_id = Column(String(255), nullable=False, index=True)
     amount = Column(Numeric(15, 2), nullable=False)
     transaction_type = Column(String(50))
+    industry = Column(String(50), default="lending", nullable=False, index=True)  # New: industry vertical (fintech, lending, crypto, ecommerce, betting, marketplace, gaming)
 
     # Detection inputs
     device_id = Column(String(255))
@@ -97,6 +98,10 @@ class ConsortiumIntelligence(Base):
     total_amount_involved = Column(Numeric(15, 2), default=0)
     risk_level = Column(String(20))  # low, medium, high, critical
 
+    # Multi-vertical support (NEW)
+    verticals = Column(JSONB)  # Industries where fraud detected: ["lending", "crypto"]
+    vertical_fraud_counts = Column(JSONB)  # Per-vertical fraud counts: {"lending": 5, "crypto": 2}
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -133,10 +138,18 @@ class Client(Base):
     enabled_rules = Column(JSONB)  # List of enabled rule names
     custom_rules = Column(JSONB)  # Custom rules defined by client
 
+    # Multi-vertical configuration (NEW)
+    enabled_verticals = Column(JSONB, default=lambda: ['lending'])  # List of enabled verticals: ['lending', 'crypto', 'ecommerce', 'betting', 'payments', 'transfers']
+    vertical_thresholds = Column(JSONB)  # Per-vertical risk thresholds: {"crypto": {"high": 65, "medium": 35}, "ecommerce": {...}}
+    vertical_weights = Column(JSONB)  # Per-vertical rule weights for ML: {"crypto": {"new_wallet_high_value": 1.2}, ...}
+
     # Metrics
     total_checks = Column(Integer, default=0)
     total_fraud_caught = Column(Integer, default=0)
     total_amount_saved = Column(Numeric(15, 2), default=0)
+
+    # Per-vertical metrics (NEW)
+    vertical_metrics = Column(JSONB)  # Per-vertical statistics: {"lending": {"checks": 100, "fraud_caught": 5, "amount_saved": 2500000}, "crypto": {...}}
 
     # Contact information
     contact_name = Column(String(255))
@@ -169,7 +182,8 @@ class RuleAccuracy(Base):
     __tablename__ = "rule_accuracy"
 
     id = Column(Integer, primary_key=True, index=True)
-    rule_name = Column(String(100), unique=True, nullable=False, index=True)
+    rule_name = Column(String(100), nullable=False, index=True)
+    industry = Column(String(50), default="lending", nullable=False, index=True)  # NEW: per-vertical tracking
 
     # Performance metrics
     triggered_count = Column(Integer, default=0)
@@ -188,6 +202,11 @@ class RuleAccuracy(Base):
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Composite unique constraint for rule + industry combo
+    __table_args__ = (
+        Index('idx_rule_industry', 'rule_name', 'industry', unique=True),
+    )
 
 
 class VelocityCheck(Base):
