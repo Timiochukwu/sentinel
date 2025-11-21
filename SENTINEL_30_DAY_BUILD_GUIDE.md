@@ -4493,11 +4493,19 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 router = APIRouter()
-engine = FraudRulesEngine()
+_engine = None  # Singleton instance
+
+def get_fraud_engine() -> FraudRulesEngine:
+    """Get or create fraud rules engine instance (singleton pattern)"""
+    global _engine
+    if _engine is None:
+        _engine = FraudRulesEngine()
+    return _engine
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint"""
+    engine = get_fraud_engine()
     return HealthResponse(
         status="healthy",
         version="0.1.0",
@@ -4527,6 +4535,7 @@ async def check_transaction(
         context = RuleContext(transaction=tx_data)
 
         # Evaluate
+        engine = get_fraud_engine()
         result = engine.evaluate_transaction(tx_data, context)
 
         # Determine fraud level
@@ -5085,6 +5094,25 @@ async def get_vertical_metrics(vertical: str):
         }
     except ValueError:
         return {"error": f"Invalid vertical: {vertical}"}, 400
+
+@router.get("/verticals/{vertical}/rules")
+async def get_vertical_rules(vertical: str):
+    """Get all rules applicable to a vertical with their weights"""
+    engine = get_fraud_engine()
+    try:
+        vert = IndustryVertical(vertical)
+        config = engine.vertical_configs.get(vert.value)
+        if not config:
+            return {"error": f"Vertical {vertical} not found"}, 404
+
+        return {
+            "vertical": vertical,
+            "rule_weights": config.rule_weights,
+            "total_rules_configured": len(config.rule_weights),
+            "total_rules_available": len(engine.rules)
+        }
+    except ValueError:
+        return {"error": f"Invalid vertical: {vertical}"}, 400
 ```
 
 ### 📝 Create: tests/test_day15.py
@@ -5134,6 +5162,15 @@ class TestVerticalEndpoints:
         assert data["vertical"] == "payments"
         assert "fraud_rate" in data
         print(f"✅ Metrics retrieved: {data['fraud_rate']}% fraud rate")
+
+    def test_vertical_rules(self):
+        response = client.get("/verticals/lending/rules")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["vertical"] == "lending"
+        assert "rule_weights" in data
+        assert "total_rules_available" in data
+        print(f"✅ Lending rules retrieved: {data['total_rules_available']} total rules")
 ```
 
 ### ✅ Verification
