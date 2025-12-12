@@ -2,7 +2,7 @@
 
 from typing import List
 from pydantic_settings import BaseSettings
-from pydantic import validator
+from pydantic import Field, validator
 
 
 class Settings(BaseSettings):
@@ -13,7 +13,11 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
-    SECRET_KEY: str = "change-this-secret-key-in-production"
+    SECRET_KEY: str = Field(
+        ...,
+        min_length=32,
+        description="Secret key for JWT encoding. MUST be set via environment variable. Generate with: openssl rand -hex 32"
+    )
 
     # API
     API_V1_PREFIX: str = "/api/v1"
