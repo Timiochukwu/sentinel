@@ -12,7 +12,7 @@
 # 📅 DAY 21: Multi-Vertical Support - Core Implementation
 
 ## 🎯 What We're Building Today
-- 7 industry verticals (lending, fintech, payments, crypto, ecommerce, betting, gaming, marketplace)
+- 7 industry verticals (lending, fintech, ecommerce, betting, gaming, crypto, marketplace)
 - Vertical-specific fraud thresholds
 - Vertical-specific rule weighting
 - Database field for vertical tracking
@@ -25,82 +25,76 @@
 
 ## 📝 Reference: Understanding Verticals
 
-The actual codebase supports these verticals:
+The actual codebase supports these 7 verticals (from app/models/schemas.py):
 
 ```
 1. LENDING (Banks, credit cards, personal loans)
    - Threshold: 65% (Higher risk tolerance)
    - Special Focus: KYC, identity verification, account age
-   - Example Rules: MaximumFirstTransactionRule, LoanStackingRule
+   - Example Rules: LoanStackingRule, MaximumFirstTransactionRule
 
-2. FINTECH (Digital wallets, payment apps)
+2. FINTECH (Digital wallets, payment apps, payment processors)
    - Threshold: 60% (Medium risk)
-   - Special Focus: Account age, email verification, velocity
+   - Special Focus: Account age, email verification, velocity, payments
    - Example Rules: NewAccountLargeAmountRule, VelocityCheckRule
 
-3. PAYMENTS (Payment processors, gateways)
-   - Threshold: 70% (Highest tolerance - high transaction volume)
-   - Special Focus: Merchant patterns, transaction velocity
-   - Example Rules: MerchantVelocityRule, RoundAmountRule
-
-4. CRYPTO (Cryptocurrency exchanges)
-   - Threshold: 50% (Lower tolerance - high fraud risk)
-   - Special Focus: Sanctions checks, wallet validation
-   - Example Rules: SuspiciousWalletRule, NewWalletHighValueRule
-
-5. ECOMMERCE (Online retail, marketplaces)
+3. ECOMMERCE (Online retail)
    - Threshold: 60%
    - Special Focus: Shipping address, card testing, chargebacks
-   - Example Rules: ShippingMismatchRule, CardBINFraudRule
+   - Example Rules: ShippingMismatchRule, CardBINFraudRule, DigitalGoodsHighValueRule
 
-6. BETTING (Sports betting, gambling)
+4. BETTING (Sports betting, gambling)
    - Threshold: 55%
    - Special Focus: Bonus abuse, arbitrage detection, withdrawals
-   - Example Rules: ArbitrageBettingRule, ExcessiveWithdrawalsRule
+   - Example Rules: BonusAbuseRule, ArbitrageBettingRule, ExcessiveWithdrawalsRule
 
-7. GAMING (Online gaming, esports)
+5. GAMING (Online gaming, esports)
    - Threshold: 50%
    - Special Focus: Account age, device sharing, unusual behavior
    - Example Rules: DeviceSharingRule, DormantAccountActivationRule
 
-8. MARKETPLACE (P2P marketplaces)
+6. CRYPTO (Cryptocurrency exchanges)
+   - Threshold: 50% (Lower tolerance - high fraud risk)
+   - Special Focus: Sanctions checks, wallet validation
+   - Example Rules: SuspiciousWalletRule, NewWalletHighValueRule, P2PVelocityRule
+
+7. MARKETPLACE (P2P marketplaces, multi-sided marketplaces)
    - Threshold: 60%
    - Special Focus: Seller velocity, buyer history, dispute patterns
-   - Example Rules: P2PVelocityRule, NewSellerHighValueRule
+   - Example Rules: NewSellerHighValueRule, LowRatedSellerRule, HighRiskCategoryRule
 ```
 
 ## 📝 Update: app/models/schemas.py (Add Verticals)
 
 ```python
-# Add to existing schemas.py
+# Add to existing schemas.py - matches production app/models/schemas.py
 
 from enum import Enum
 
-class IndustryVertical(str, Enum):
-    """Supported industry verticals"""
-    LENDING = "lending"
-    FINTECH = "fintech"
-    PAYMENTS = "payments"
-    CRYPTO = "crypto"
-    ECOMMERCE = "ecommerce"
-    BETTING = "betting"
-    GAMING = "gaming"
-    MARKETPLACE = "marketplace"
+class Industry(str, Enum):
+    """Industry vertical - from production schemas.py"""
+    FINTECH = "fintech"          # Digital banking, payments
+    LENDING = "lending"          # Loan providers
+    ECOMMERCE = "ecommerce"      # Online shopping
+    BETTING = "betting"          # Sports betting
+    GAMING = "gaming"            # Online gaming
+    CRYPTO = "crypto"            # Cryptocurrency exchanges
+    MARKETPLACE = "marketplace"  # Multi-sided marketplaces
 
 
 class VerticalConfig(BaseModel):
     """Configuration for each vertical"""
-    vertical: IndustryVertical
+    vertical: Industry
     fraud_score_threshold: float
     rule_weight_multiplier: Dict[str, float] = {}
     aml_risk_threshold: float
     enabled: bool = True
 
 
-# Update TransactionCheckRequest
+# Update TransactionCheckRequest - matches production
 class TransactionCheckRequest(BaseModel):
     # ... existing fields ...
-    vertical: IndustryVertical = IndustryVertical.PAYMENTS
+    industry: Optional[str] = Field(None, description="Industry vertical (fintech, ecommerce, betting, crypto, marketplace)")
 ```
 
 ## ✅ Verification
@@ -108,13 +102,13 @@ class TransactionCheckRequest(BaseModel):
 ```bash
 # Test vertical loading
 python -c "
-from app.models.schemas import IndustryVertical
-verticals = list(IndustryVertical)
+from app.models.schemas import Industry
+verticals = list(Industry)
 print(f'✅ Verticals loaded: {len(verticals)}')
 for v in verticals:
     print(f'   - {v.value}')
 "
-# Expected: 8 verticals listed
+# Expected: 7 verticals listed
 ```
 
 **⏹️ STOP HERE - END OF DAY 13**
@@ -918,13 +912,13 @@ echo "structlog==23.2.0" >> requirements.txt
 - Day 42: structlog
 
 **Progress After Day 45:**
-- 30 fraud rules + vertical customization
-- 249+ features calculated
+- 29 fraud rules + vertical customization
+- Feature engineering for ML
 - ML model trained and integrated
 - Advanced caching layer
 - Complete fraud detection pipeline
 
-**Next: Continue to PART 3 for Days 25-30 - Production Ready**
+**Next: Continue to PART 3 for Days 46-60 - Production Ready**
 
 ---
 

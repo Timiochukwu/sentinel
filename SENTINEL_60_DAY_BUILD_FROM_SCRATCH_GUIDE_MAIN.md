@@ -1,11 +1,11 @@
 # 🚀 SENTINEL FRAUD DETECTION - 60-DAY BUILD GUIDE (PART 1)
 ## Days 1-20: Foundation & Core Implementation
 
-**Note:** This guide maps to the ACTUAL production codebase with **30 fraud detection rules** across 7 industry verticals, multiple advanced services, and enterprise-grade architecture.
+**Note:** This guide maps to the ACTUAL production codebase with **29 fraud detection rules** across 7 industry verticals, multiple advanced services, and enterprise-grade architecture.
 
 **Estimated Time:** 20 working days (4 weeks)
 
-**Final Output After Day 20:** Working API with core fraud detection engine, database, authentication, and all 30 rules loaded
+**Final Output After Day 20:** Working API with core fraud detection engine, database, authentication, and all 29 rules loaded
 
 ---
 
@@ -22,7 +22,7 @@ This comprehensive 60-day guide is split into 3 parts:
 - **Progressive Complexity:** Start simple, build towards enterprise features
 
 **Reference Documents:**
-- `app/services/rules.py` - All 30 fraud detection rules
+- `app/services/rules.py` - All 29 fraud detection rules
 - `app/core/config.py` - Configuration with Field() requirements
 - `requirements.txt` - Exact package versions
 
@@ -505,9 +505,9 @@ class FraudRule:
         raise NotImplementedError
 ```
 
-## 📚 Understanding the 30 Production Rules
+## 📚 Understanding the 29 Production Rules
 
-The production system has 30 fraud rules organized into categories:
+The production system has 29 fraud rules organized into categories:
 
 ### Core/Lending Rules (15 rules)
 1. NewAccountLargeAmountRule
@@ -547,9 +547,6 @@ The production system has 30 fraud rules organized into categories:
 27. NewSellerHighValueRule
 28. LowRatedSellerRule
 29. HighRiskCategoryRule
-
-### Device Fingerprinting Rules (1 rule)
-30. DeviceFingerprintRule (in fingerprint_rules.py)
 
 ## ✅ End of Day 4 Checklist
 - [ ] Base FraudRule class created
@@ -963,36 +960,25 @@ psql sentinel_db -c "\dt"
 
 ---
 
-# 📅 DAY 4: Core Fraud Detection Rules Framework
+# 📅 DAY 6-9: Implementing Core Fraud Rules
 
-## 🎯 What We're Building Today
-- Understanding the actual FraudRulesEngine (269 rules)
-- Base FraudRule class
-- Rule categories and metadata
-- Rule registration system
+## 🎯 What We're Building These Days
+- Days 6-9 focus on implementing the core fraud rules from the production system
+- Understanding how each rule works
+- Building the FraudRulesEngine
 
 ## 📦 Install Today
 No new installations needed
 
-## 📝 Reference: Understanding Existing Rules System
+## 📝 Understanding the Production Rules System
 
-The actual codebase in `app/services/rules.py` contains **269 fraud detection rules** organized by:
-
-1. **Identity Rules** - Email, phone, KYC, BVN verification
-2. **Behavioral Rules** - Account age, velocity, login patterns
-3. **Transaction Rules** - Amount patterns, merchant velocity, card testing
-4. **Network Rules** - IP reputation, geolocation, device fingerprinting
-5. **Advanced Rules** - SIM swap, device sharing, impossible travel
-6. **Vertical-Specific Rules** - Lending, crypto, fintech, gaming specific
-7. **ML-Based Rules** - Anomaly detection using machine learning
-8. **Consortium Rules** - Industry blocklist checks
+The actual codebase in `app/services/rules.py` contains **29 fraud detection rules** organized into:
 
 ## 📝 Base FraudRule Architecture (Simplified View)
 
 ```python
 """
-Simplified view of the actual FraudRule base class
-See SENTINEL_FRAUD_RULES_REFERENCE.md for complete list of 269 rules
+Simplified view of the actual FraudRule base class from app/services/rules.py
 """
 
 from enum import Enum
@@ -1047,11 +1033,11 @@ class FraudRule(ABC):
 
 ## 📝 Files to Create/Reference: app/services/rules.py (EXISTING BUT MASSIVE)
 
-In the actual codebase, this file contains **269 rules**. Key implementation patterns:
+In the actual codebase, this file contains **29 rules**. Key implementation patterns:
 
 ```python
 """
-Example rule implementations (see SENTINEL_FRAUD_RULES_REFERENCE.md for all 269)
+Example rule implementations from app/services/rules.py
 """
 
 class NewAccountLargeAmountRule(FraudRule):
@@ -1112,7 +1098,7 @@ from app.services.rules import FraudRulesEngine
 engine = FraudRulesEngine()
 print(f'✅ Fraud Rules Engine initialized')
 print(f'✅ Total rules loaded: {len(engine.rules)}')
-print(f'✅ Expected: 269 rules')
+print(f'✅ Expected: 29 rules')
 "
 ```
 
@@ -1126,22 +1112,19 @@ print(f'✅ Expected: 269 rules')
 Days 6-9 are focused on **implementing the first 15 core fraud rules** from the production system.
 
 All fraud rules are already implemented in:
-- `app/services/rules.py` (1,500+ lines)
-- `app/services/fingerprint_rules.py` (Fingerprinting-specific)
-- `app/core/fraud_detector_v2.py` (Advanced fraud detection)
+- `app/services/rules.py` (880+ lines containing 29 rules)
+- `app/services/fingerprint_rules.py` (Device fingerprinting-specific rules)
+- `app/core/fraud_detector.py` (Main fraud detection orchestrator)
 
 ## 📚 Reference Documentation
-See: **app/services/rules.py** for complete implementation of all 30 rules
+See: **app/services/rules.py** for complete implementation of all 29 rules
 
-### Rule Distribution:
-- Identity Rules: ~30 rules
-- Behavioral Rules: ~35 rules
-- Transaction Rules: ~40 rules
-- Network Rules: ~40 rules
-- Advanced Rules: ~40 rules
-- Vertical-Specific Rules: ~30 rules
-- ML-Based Rules: ~25 rules
-- Consortium Rules: ~29 rules
+### The 29 Rules are divided into:
+- Core/Lending Rules: 15 rules
+- E-commerce Rules: 4 rules
+- Betting/Gaming Rules: 4 rules
+- Crypto Rules: 3 rules
+- Marketplace Rules: 3 rules
 
 ## ✅ Daily Verification (Days 5-9)
 
@@ -1434,7 +1417,7 @@ async def check_transaction(
     """
     Check a single transaction for fraud
 
-    This endpoint evaluates the transaction against all 269 fraud detection rules.
+    This endpoint evaluates the transaction against all 29 fraud detection rules.
     """
     engine = get_fraud_engine()
 
@@ -1491,7 +1474,7 @@ async def get_rules_count():
     engine = get_fraud_engine()
     return {
         "total_rules": len(engine.rules),
-        "description": "Sentinel has 269 fraud detection rules across 8 categories"
+        "description": "Sentinel has 29 fraud detection rules across 5 categories"
     }
 ```
 
@@ -1516,7 +1499,7 @@ curl -X POST http://localhost:8000/api/v1/fraud/check \
 
 # Check rules count
 curl http://localhost:8000/api/v1/fraud/rules/count
-# Expected: {"total_rules": 269, ...}
+# Expected: {"total_rules": 29, ...}
 ```
 
 **⏹️ STOP HERE - END OF DAY 11**
@@ -1596,7 +1579,7 @@ class TestFraudDetectionEndpoints:
         response = client.get("/api/v1/fraud/rules/count")
         assert response.status_code == 200
         data = response.json()
-        assert data["total_rules"] == 269
+        assert data["total_rules"] == 29
         print(f"✅ Rules loaded: {data['total_rules']}")
 ```
 
@@ -1771,7 +1754,7 @@ def hash_email(email: str) -> str:
 - Python environment with incremental package installation
 - PostgreSQL database with complete models
 - Configuration with Field() validation for SECRET_KEY
-- **30 fraud detection rules** implemented
+- **29 fraud detection rules** implemented
 - FastAPI application with full API structure
 - Security and authentication foundation
 - All core components integrated
@@ -1785,7 +1768,7 @@ def hash_email(email: str) -> str:
 
 **Total Progress:**
 - Complete project structure
-- 30 fraud rules across 7 industry verticals
+- 29 fraud rules across 7 industry verticals
 - Core API endpoints
 - Security implementation
 - Ready for advanced features (Days 21-45)
