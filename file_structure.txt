@@ -1,0 +1,98 @@
+.
+├── API_EXAMPLES.md
+├── CRITICAL_FEATURES_IMPLEMENTATION.md
+├── DATA_SOURCES_GUIDE.md
+├── DEPLOYMENT.md
+├── Dockerfile
+├── IMPROVEMENTS.md
+├── IMPROVEMENT_OPPORTUNITIES.md
+├── LICENSE
+├── MAC_SETUP_GUIDE.md
+├── MULTI_VERTICAL_GUIDE.md
+├── NEW_FEATURES.md
+├── README.md
+├── RULES_AND_FEATURES.md
+├── app
+│   ├── __init__.py
+│   ├── api
+│   │   ├── __init__.py
+│   │   ├── deps.py
+│   │   └── v1
+│   │       ├── __init__.py
+│   │       ├── api.py
+│   │       └── endpoints
+│   │           ├── __init__.py
+│   │           ├── dashboard.py
+│   │           ├── feedback.py
+│   │           └── fraud_detection.py
+│   ├── core
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   ├── fraud_detector.py
+│   │   ├── fraud_detector_v2.py
+│   │   ├── logging_config.py
+│   │   ├── monitoring.py
+│   │   └── security.py
+│   ├── db
+│   │   ├── __init__.py
+│   │   └── session.py
+│   ├── main.py
+│   ├── middleware
+│   │   ├── __init__.py
+│   │   └── rate_limit.py
+│   ├── models
+│   │   ├── __init__.py
+│   │   ├── database.py
+│   │   └── schemas.py
+│   └── services
+│       ├── __init__.py
+│       ├── bvn_verification.py
+│       ├── cache_service.py
+│       ├── consortium.py
+│       ├── learning.py
+│       ├── ml_detector.py
+│       ├── redis_service.py
+│       ├── rules.py
+│       └── webhook.py
+├── docker-compose.yml
+├── file_structure.txt
+├── frontend
+│   ├── README.md
+│   ├── index.html
+│   ├── package.json
+│   ├── postcss.config.js
+│   ├── src
+│   │   ├── App.tsx
+│   │   ├── components
+│   │   │   ├── Background3D.tsx
+│   │   │   ├── Layout.tsx
+│   │   │   └── StatCard.tsx
+│   │   ├── index.css
+│   │   ├── main.tsx
+│   │   ├── pages
+│   │   │   ├── Analytics.tsx
+│   │   │   ├── Dashboard.tsx
+│   │   │   ├── Login.tsx
+│   │   │   ├── Settings.tsx
+│   │   │   └── Transactions.tsx
+│   │   └── types
+│   │       └── index.ts
+│   ├── tailwind.config.js
+│   ├── tsconfig.json
+│   ├── tsconfig.node.json
+│   └── vite.config.ts
+├── requirements.txt
+├── scripts
+│   ├── __init__.py
+│   ├── generate_synthetic_data.py
+│   ├── init_db.py
+│   ├── ml
+│   │   ├── __init__.py
+│   │   └── train_model.py
+│   └── seed_data.py
+└── tests
+    ├── __init__.py
+    ├── test_api.py
+    └── test_rules.py
+
+18 directories, 78 files
