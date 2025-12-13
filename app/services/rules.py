@@ -3188,6 +3188,11 @@ class FraudRulesEngine:
         """
         Evaluate fraud detection rules for a specific industry vertical
 
+        Now applies vertical-specific rule weights and thresholds!
+        - Crypto: Wallet rules weighted 1.8x (higher risk)
+        - Lending: Loan stacking weighted 1.5x (critical for lending)
+        - Betting: Bonus abuse weighted 1.8x (common fraud vector)
+
         Args:
             transaction: Transaction data
             context: Additional context (consortium data, velocity data, etc.)
@@ -3200,29 +3205,71 @@ class FraudRulesEngine:
         if industry is None:
             industry = str(transaction.industry) if hasattr(transaction.industry, 'value') else transaction.industry
 
+        # Get vertical configuration for weights and thresholds
+        from app.services.vertical_service import vertical_service
+        from app.models.schemas import Industry
+
+        try:
+            industry_enum = Industry(industry)
+            vertical_config = vertical_service.get_config(industry_enum)
+        except (ValueError, AttributeError):
+            # Fallback if industry invalid
+            vertical_config = None
+
         flags: List[FraudFlag] = []
 
         # Get rules for this vertical only
         applicable_rules = self.get_rules_for_vertical(industry)
 
-        # Run vertical-specific rules
+        # Run vertical-specific rules and apply weight multipliers
         for rule in applicable_rules:
             flag = rule.check(transaction, context)
             if flag:
+                # Apply vertical-specific weight multiplier
+                if vertical_config:
+                    # Get weight for this specific rule in this vertical
+                    rule_class_name = rule.__class__.__name__
+                    weight = vertical_config.rule_weight_multiplier.get(rule_class_name, 1.0)
+
+                    # Apply weight to score
+                    original_score = flag.score
+                    weighted_score = int(original_score * weight)
+
+                    # Update flag with weighted score and metadata
+                    flag.score = weighted_score
+                    if not flag.metadata:
+                        flag.metadata = {}
+                    flag.metadata["original_score"] = original_score
+                    flag.metadata["weight_multiplier"] = weight
+                    flag.metadata["vertical"] = industry
+
                 flags.append(flag)
 
-        # Calculate total risk score
+        # Calculate total risk score with weighted scores
         total_score = sum(flag.score for flag in flags)
         risk_score = min(total_score, 100)  # Cap at 100
 
-        # Determine risk level and decision
-        if risk_score >= 70:
+        # Determine risk level and decision using vertical-specific threshold
+        if vertical_config:
+            threshold = vertical_config.fraud_score_threshold
+        else:
+            threshold = 60.0  # Default threshold
+
+        # Decision logic with vertical-specific threshold
+        if risk_score >= 80:
+            # Critical risk - always decline regardless of vertical
             risk_level = "high"
             decision = "decline"
-        elif risk_score >= 40:
+        elif risk_score >= threshold:
+            # Above vertical threshold - flag as high risk
+            risk_level = "high"
+            decision = "decline"
+        elif risk_score >= (threshold * 0.7):  # 70% of threshold
+            # Medium risk - send for review
             risk_level = "medium"
             decision = "review"
         else:
+            # Below threshold - approve
             risk_level = "low"
             decision = "approve"
 
