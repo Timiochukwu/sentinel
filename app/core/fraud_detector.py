@@ -27,6 +27,7 @@ from app.models.database import Transaction, Client
 from app.services.rules import FraudRulesEngine
 from app.services.consortium import ConsortiumService
 from app.services.fingerprint_rules import FingerprintFraudRules
+from app.services.feature_storage import feature_storage
 from app.core.security import hash_device_id, hash_bvn, hash_phone, hash_email
 from app.core.config import settings
 
@@ -253,8 +254,10 @@ class FraudDetector:
         # - ML model training
         # - Fraud pattern identification
         # - Client analytics/reporting
+        # Now also extracts and stores 249+ ML features in JSONB columns!
         self._store_transaction(
             transaction=transaction,
+            context=context,  # Pass context for feature extraction
             risk_score=risk_score,
             risk_level=risk_level,
             decision=decision,
@@ -713,6 +716,7 @@ class FraudDetector:
     def _store_transaction(
         self,
         transaction: TransactionCheckRequest,
+        context: Dict[str, Any],
         risk_score: int,
         risk_level: str,
         decision: str,
@@ -729,6 +733,17 @@ class FraudDetector:
         4. **Learning**: Identify new fraud patterns over time
         5. **Reporting**: Client dashboards and fraud reports
 
+        NEW: Now extracts and stores 249+ ML features in JSONB columns!
+        - Identity features (40): email, phone, BVN, device, network
+        - Behavioral features (60): session, login, transaction, interaction
+        - Transaction features (40): card, banking, address, crypto, merchant
+        - Network features (40): consortium, fraud linkage, velocity, graph
+        - ATO signals (15): account takeover patterns
+        - Funding fraud (10): card testing, new sources
+        - Merchant abuse (10): refund/promo abuse
+        - ML features (9): statistical outliers, model scores
+        - Derived features (25): similarity, linkage, clustering
+
         Privacy & Security:
         - All PII (BVN, phone, email, device ID) is hashed with SHA-256
         - We NEVER store raw PII
@@ -737,6 +752,7 @@ class FraudDetector:
 
         Args:
             transaction: Original transaction request
+            context: Enriched context (consortium, velocity, etc.)
             risk_score: Calculated risk score (0-100)
             risk_level: "low", "medium", or "high"
             decision: "approve", "review", or "decline"
@@ -744,18 +760,20 @@ class FraudDetector:
             processing_time_ms: How long the check took
 
         Returns:
-            None (saves to database)
+            None (saves to database with features)
 
         Side effects:
         - Creates new Transaction record in database
+        - Extracts and stores 249+ features in JSONB columns
         - Updates client's total_checks counter
-        - Enables future fraud pattern detection
+        - Enables future fraud pattern detection and ML training
 
         Example:
             After processing a transaction:
             - Transaction stored with hashed PII
+            - 249+ features extracted and stored in 9 JSONB columns
             - Client's total_checks incremented
-            - Data available for analytics and ML training
+            - Data ready for analytics, ML training, and behavioral profiling
         """
 
         # STEP 1: Hash all sensitive identifiers before storage
@@ -977,6 +995,21 @@ class FraudDetector:
         # Save transaction to database
         self.db.add(db_transaction)
         self.db.commit()
+
+        # STEP 3.5: Extract and store ML features in JSONB columns
+        # This happens AFTER committing the transaction so we have a transaction_id
+        # Features enable: ML training, behavioral profiling, anomaly detection
+        try:
+            features = feature_storage.extract_features(transaction, context)
+            feature_storage.store_features(
+                transaction_id=transaction.transaction_id,
+                features=features,
+                db=self.db
+            )
+        except Exception as e:
+            # Log error but don't fail the fraud check
+            # Feature storage is important but not critical for real-time fraud detection
+            print(f"Warning: Failed to store features for {transaction.transaction_id}: {e}")
 
         # STEP 4: Update client statistics
         # Track how many fraud checks this client has performed
