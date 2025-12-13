@@ -1,137 +1,117 @@
 """
-Universal fraud detection rules that apply to ALL verticals
+Universal fraud detection rules that apply to multiple verticals
 
 These rules are fundamental fraud indicators that work across
-all industries: lending, fintech, ecommerce, crypto, betting, gaming, marketplace
+multiple industries. Some apply to all verticals, others to 4+ verticals.
 """
 
 from typing import Dict, Any, Optional
 from datetime import datetime, time
 from .base import FraudRule
-from app.models.schemas import FraudFlag, TransactionCheckRequest
+from app.schemas import FraudFlag, TransactionCheckRequest
 
 
-class NewAccountLargeAmountRule(FraudRule):
-    """New account (<7 days) with large transaction"""
-
-    def __init__(self):
-        super().__init__(
-            name="new_account_large_amount",
-            description="New account with large transaction",
-            base_score=30,
-            severity="medium",
-            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace"]
-        )
-
-    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
-        if transaction.account_age_days is not None and transaction.account_age_days < 7:
-            if transaction.amount > 100000:  # ₦100k
-                return FraudFlag(
-                    type=self.name,
-                    severity=self.severity,
-                    message=f"Account only {transaction.account_age_days} days old requesting ₦{transaction.amount:,.0f}",
-                    score=self.base_score,
-                    confidence=0.87
-                )
-        return None
-
-
-class VelocityCheckRule(FraudRule):
-    """Transaction velocity - too many transactions in short time"""
+class DuplicateTransactionRule(FraudRule):
+    """Duplicate transaction detected"""
 
     def __init__(self):
         super().__init__(
-            name="velocity_check",
-            description="Too many transactions in short time",
-            base_score=30,
-            severity="medium",
-            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
+            name="duplicate_transaction",
+            description="Same transaction duplicated",
+            base_score=26,
+            severity="high",
+            verticals=["ecommerce", "payments", "betting", "crypto"]
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
-        velocity_data = context.get("velocity", {})
-        count_10min = velocity_data.get("transaction_count_10min", 0)
-
-        if count_10min > 3:
+        is_duplicate = context.get("is_duplicate_transaction", False)
+        if is_duplicate:
             return FraudFlag(
                 type=self.name,
                 severity=self.severity,
-                message=f"{count_10min} transactions in 10 minutes",
                 score=self.base_score,
-                confidence=0.82
+                confidence=0.95,
+                message="Duplicate transaction detected"
             )
         return None
 
 
-class SuspiciousHoursRule(FraudRule):
-    """Transaction during suspicious hours (2am-5am)"""
+class RefundAbusePatternRule(FraudRule):
+    """Rule 53: Refund Abuse Pattern"""
 
     def __init__(self):
         super().__init__(
-            name="suspicious_hours",
-            description="Transaction during suspicious hours",
-            base_score=15,
-            severity="low",
-            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
+            name="refund_abuse_pattern",
+            description="Pattern of refunds",
+            base_score=28,
+            severity="high",
+            verticals=["ecommerce", "fintech", "payments", "marketplace"]
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
-        current_time = datetime.now().time()
-        if time(2, 0) <= current_time <= time(5, 0):
+        if transaction.refund_history_count and transaction.refund_history_count > 5:
             return FraudFlag(
                 type=self.name,
                 severity=self.severity,
-                message=f"Transaction at {current_time.strftime('%I:%M %p')} - unusual hours",
                 score=self.base_score,
-                confidence=0.65
+                confidence=0.84,
+                message=f"{transaction.refund_history_count} refunds on record"
             )
         return None
 
 
-class DisposableEmailRule(FraudRule):
-    """Detects disposable/temporary email addresses"""
+class RefundAbuseSerialRule(FraudRule):
+    """Rule 76: Serial Refund Abuser"""
 
     def __init__(self):
         super().__init__(
-            name="disposable_email",
-            description="Using disposable email service",
-            base_score=20,
-            severity="medium",
-            verticals=["lending", "fintech", "payments", "ecommerce", "betting", "crypto", "marketplace", "gaming"]
+            name="refund_abuse_serial",
+            description="Serial refund abuse pattern",
+            base_score=35,
+            severity="high",
+            verticals=["ecommerce", "fintech", "payments", "marketplace"]
         )
 
     def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
-        if transaction.email:
-            disposable_domains = [
-                "tempmail.com", "guerrillamail.com", "10minutemail.com",
-                "mailinator.com", "throwaway.email", "temp-mail.org"
-            ]
-            email_domain = transaction.email.split("@")[-1].lower()
-
-            if email_domain in disposable_domains:
-                return FraudFlag(
-                    type=self.name,
-                    severity=self.severity,
-                    message=f"Using disposable email: {email_domain}",
-                    score=self.base_score,
-                    confidence=0.90
-                )
+        if transaction.refund_abuse_pattern:
+            return FraudFlag(
+                type=self.name,
+                severity=self.severity,
+                score=self.base_score,
+                confidence=0.88,
+                message="Serial refund abuse pattern detected"
+            )
         return None
 
 
-# Add more universal rules here...
-# - RoundAmountRule
-# - VPNProxyRule
-# - DeviceSharingRule
-# - ImpossibleTravelRule
-# etc.
+class ChargebackAbuseSerialRule(FraudRule):
+    """Rule 77: Serial Chargeback Abuser"""
+
+    def __init__(self):
+        super().__init__(
+            name="chargeback_abuse_serial",
+            description="Serial chargeback abuse pattern",
+            base_score=38,
+            severity="critical",
+            verticals=["ecommerce", "fintech", "payments", "marketplace"]
+        )
+
+    def check(self, transaction: TransactionCheckRequest, context: Dict[str, Any]) -> Optional[FraudFlag]:
+        if transaction.chargeback_abuse_pattern:
+            return FraudFlag(
+                type=self.name,
+                severity=self.severity,
+                score=self.base_score,
+                confidence=0.90,
+                message="Serial chargeback abuse pattern"
+            )
+        return None
 
 
-# Export all universal rules
+# Export all universal/cross-cutting rules
 UNIVERSAL_RULES = [
-    NewAccountLargeAmountRule(),
-    VelocityCheckRule(),
-    SuspiciousHoursRule(),
-    DisposableEmailRule(),
-    # Add more as they're migrated...
+    DuplicateTransactionRule(),
+    RefundAbusePatternRule(),
+    RefundAbuseSerialRule(),
+    ChargebackAbuseSerialRule(),
 ]
