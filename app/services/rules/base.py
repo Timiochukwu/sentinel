@@ -65,39 +65,33 @@ class FraudRulesEngine:
         """
         Load all rules from vertical modules
 
-        Note: Import rules from vertical modules here
-        This will be populated as we migrate rules
+        Imports all fraud detection rules from organized vertical-specific modules
         """
-        # from .lending import LENDING_RULES
-        # from .fintech import FINTECH_RULES
-        # from .ecommerce import ECOMMERCE_RULES
-        # from .crypto import CRYPTO_RULES
-        # from .betting import BETTING_RULES
-        # from .gaming import GAMING_RULES
-        # from .marketplace import MARKETPLACE_RULES
-        # from .universal import UNIVERSAL_RULES
-        # from .identity import IDENTITY_RULES
-        # from .device import DEVICE_RULES
-        # from .network import NETWORK_RULES
-        # from .behavioral import BEHAVIORAL_RULES
-        # from .ato import ATO_RULES
+        from .lending import LENDING_RULES
+        from .ecommerce import ECOMMERCE_RULES
+        from .crypto import CRYPTO_RULES
+        from .betting import BETTING_RULES
+        from .marketplace import MARKETPLACE_RULES
+        from .universal import UNIVERSAL_RULES
+        from .identity import IDENTITY_RULES
+        from .device import DEVICE_RULES
+        from .network import NETWORK_RULES
+        from .behavioral import BEHAVIORAL_RULES
+        from .ato import ATO_RULES
 
-        # self.all_rules = (
-        #     LENDING_RULES +
-        #     FINTECH_RULES +
-        #     ECOMMERCE_RULES +
-        #     CRYPTO_RULES +
-        #     BETTING_RULES +
-        #     GAMING_RULES +
-        #     MARKETPLACE_RULES +
-        #     UNIVERSAL_RULES +
-        #     IDENTITY_RULES +
-        #     DEVICE_RULES +
-        #     NETWORK_RULES +
-        #     BEHAVIORAL_RULES +
-        #     ATO_RULES
-        # )
-        pass
+        self.all_rules = (
+            LENDING_RULES +
+            ECOMMERCE_RULES +
+            CRYPTO_RULES +
+            BETTING_RULES +
+            MARKETPLACE_RULES +
+            UNIVERSAL_RULES +
+            IDENTITY_RULES +
+            DEVICE_RULES +
+            NETWORK_RULES +
+            BEHAVIORAL_RULES +
+            ATO_RULES
+        )
 
     def get_rules_for_vertical(self, industry: str) -> List[FraudRule]:
         """Get all rules that apply to the given industry vertical"""
